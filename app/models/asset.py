@@ -39,6 +39,14 @@ class Asset(Base):
     assigned_to = relationship("User", foreign_keys=[assigned_to_id])
     assignment_history = relationship("AssetAssignment", back_populates="asset")
 
+    @property
+    def asset_id(self) -> str:
+        return self.asset_tag
+
+    @property
+    def assigned_to_name(self) -> Optional[str]:
+        return self.assigned_to.full_name if self.assigned_to else None
+
 
 class AssetAssignment(Base):
     __tablename__ = "asset_assignments"

@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -5,7 +6,7 @@ from app.database.connection import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, Token
 from app.utils.security import hash_password, verify_password, create_access_token
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_role
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -29,15 +30,12 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
     # 2. Hash the raw password
     hashed_pwd = hash_password(user_in.password)
 
-    # Auto-assign SUPPORT role if email starts with support.
-    role = "SUPPORT" if user_in.email.lower().startswith("support.") else "EMPLOYEE"
-
-    # 3. Create the database record
+    # 3. Create the database record (role is already derived by UserCreate schema validator)
     new_user = User(
         email=user_in.email,
         full_name=user_in.full_name,
         hashed_password=hashed_pwd,
-        role=role
+        role=user_in.role
     )
 
     db.add(new_user)
@@ -83,10 +81,22 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
 
 
 @router.get("/me", response_model=UserResponse)
-def get_current_user_profile(current_user: User = Depends(get_current_user)): #here the get_current_user will execute and provide the value to the current_user and it will only execute or any other dependecey will only work when it will have values it will be automatically excuted 
+def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """
     Protected endpoint:
     Returns the profile of the currently logged-in user.
     Requires Bearer Token in Authorization header.
     """
     return current_user
+
+
+@router.get("/users", response_model=List[UserResponse])
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List active users for ticket assignments and asset allocation.
+    """
+    return db.query(User).filter(User.is_active == True).all()
+

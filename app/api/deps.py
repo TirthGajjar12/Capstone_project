@@ -9,14 +9,12 @@ from app.models.user import User
 
 # Tells FastAPI that tokens arrive via the standard Authorization: Bearer <token> header
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login") #this takes the jwt token and uses that for every rquest in swagger ui in docs
-#print(oauth2_scheme.model.flows.password.model_dump())
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     """
     Decodes the JWT token, validates signature/expiration,
     and returns the active authenticated User from PostgreSQL.
     """
-    print(token)
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

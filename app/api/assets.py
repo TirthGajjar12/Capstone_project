@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database.connection import get_db
@@ -9,6 +9,7 @@ from app.api.deps import get_current_user, require_role
 
 router = APIRouter(prefix="/assets", tags=["Assets"])
 
+@router.post("", response_model=AssetResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 @router.post("/", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)
 def create_asset(
     asset_in: AssetCreate,
@@ -16,14 +17,36 @@ def create_asset(
     current_user: User = Depends(require_role(["ADMIN"]))  # Admin only
 ):
     """Register a new asset. Only Admins can register assets."""
-    # Check duplicate asset tag or serial number
-    if db.query(Asset).filter(Asset.asset_tag == asset_in.asset_tag).first():
-        raise HTTPException(status_code=400, detail="Asset tag already exists.")
+    # Check or auto-generate asset tag
+    tag = asset_in.asset_tag.strip() if asset_in.asset_tag else None
+    if tag:
+        if db.query(Asset).filter(Asset.asset_tag == tag).first():
+            raise HTTPException(status_code=400, detail="Asset tag already exists.")
+    else:
+        # Auto-generate unique asset_tag based on type
+        prefix_map = {
+            AssetType.LAPTOP: "LAP",
+            AssetType.MONITOR: "MON",
+            AssetType.KEYBOARD: "KEY",
+            AssetType.MOUSE: "MOU",
+            AssetType.PRINTER: "PRN"
+        }
+        prefix = prefix_map.get(asset_in.asset_type, "AST")
+        import random
+        for _ in range(50):
+            candidate = f"{prefix}-{random.randint(1000, 9999)}"
+            if not db.query(Asset).filter(Asset.asset_tag == candidate).first():
+                tag = candidate
+                break
+        if not tag:
+            import uuid
+            tag = f"{prefix}-{uuid.uuid4().hex[:6].upper()}"
+
     if db.query(Asset).filter(Asset.serial_number == asset_in.serial_number).first():
         raise HTTPException(status_code=400, detail="Serial number already exists.")
 
     new_asset = Asset(
-        asset_tag=asset_in.asset_tag,
+        asset_tag=tag,
         asset_type=asset_in.asset_type,
         brand=asset_in.brand,
         model=asset_in.model,
@@ -36,6 +59,7 @@ def create_asset(
     return new_asset
 
 
+@router.get("", response_model=List[AssetResponse], include_in_schema=False)
 @router.get("/", response_model=List[AssetResponse])
 def list_assets(
     asset_type: Optional[AssetType] = None,
@@ -45,13 +69,13 @@ def list_assets(
 ):
     """
     List assets:
-    - Admins & Support: can view all assets (with optional filters)
-    - Employees: can only view assets assigned to them
+    - Employees: can ONLY view assets assigned to their account.
+    - Admin & Support: can view all company assets in inventory.
     """
     query = db.query(Asset)
 
     if current_user.role == "EMPLOYEE":
-        # Filter only assets assigned to this employee
+        # Normal employees only see hardware assigned to them
         query = query.filter(Asset.assigned_to_id == current_user.id)
     else:
         # Admin / Support filters
@@ -61,6 +85,7 @@ def list_assets(
             query = query.filter(Asset.status == asset_status)
 
     return query.all()
+
 
 
 @router.get("/{asset_id}", response_model=AssetResponse)
@@ -74,11 +99,12 @@ def get_asset(
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found.")
 
-    # Employees can only view their own assigned asset
+    # Normal employees can only view their own assigned hardware
     if current_user.role == "EMPLOYEE" and asset.assigned_to_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to view this asset.")
 
     return asset
+
 
 
 @router.post("/{asset_id}/assign", response_model=AssetResponse)

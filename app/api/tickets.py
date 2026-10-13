@@ -1,5 +1,4 @@
 from app.services.websocket_manager import ws_manager
-from asyncio import wait
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -17,6 +16,7 @@ from app.api.deps import get_current_user, require_role
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
+@router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 @router.post("/", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
 async def create_ticket(
     ticket_in: TicketCreate,
@@ -42,12 +42,9 @@ async def create_ticket(
     now = datetime.now(timezone.utc) 
     sla_deadline = calculate_sla_deadline(priority, start_time=now)
 
-    # 3. Generate unique ticket number (e.g., INC-1001)
-    ticket_count = db.query(Ticket).count()
-    ticket_number = f"INC-{1001 + ticket_count}"
-
+    # 3. Create ticket and use DB-generated ID for a race-condition-safe ticket number
     new_ticket = Ticket(
-        ticket_number=ticket_number,
+        ticket_number="TEMP",  # Placeholder, replaced after flush
         title=ticket_in.title,
         description=ticket_in.description,
         category=category,
@@ -60,6 +57,9 @@ async def create_ticket(
     )
 
     db.add(new_ticket)
+    db.flush()  # Get DB-generated ID without committing
+    new_ticket.ticket_number = f"INC-{1000 + new_ticket.id}"
+
     db.commit()
     db.refresh(new_ticket)
 
@@ -86,6 +86,7 @@ async def create_ticket(
     return new_ticket
 
 
+@router.get("", response_model=List[TicketResponse], include_in_schema=False)
 @router.get("/", response_model=List[TicketResponse])
 def list_tickets(
     status: Optional[TicketStatus] = None,

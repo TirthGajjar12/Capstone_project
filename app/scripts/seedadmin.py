@@ -1,8 +1,8 @@
 import sys
 import os
 
-# Add root directory to python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root directory to python path (go up 3 levels: seedadmin.py → scripts → app → project root)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.database.connection import SessionLocal
 from app.models.user import User

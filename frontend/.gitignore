@@ -1,0 +1,15 @@
+node_modules/
+build/
+dist/
+.cache/
+.vite/
+.DS_Store
+*.log
+tmp/
+tmp/
+*.pem
+.env.local
+.env
+.env.dev
+.env.qa
+!.env.example

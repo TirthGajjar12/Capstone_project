@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
+from pydantic import BaseModel, EmailStr, ConfigDict, field_validator, model_validator
 from typing import Optional
 from datetime import datetime
 
@@ -31,16 +31,19 @@ class UserCreate(UserBase):
         return value
 
     # Automatically derive the role based on email pattern
-    @field_validator("role", mode="before") #It tells Pydantic to run this validator before it performs its normal validation of the role field.
+    # Uses model_validator so it always runs even when 'role' is not in the input
+    @model_validator(mode="before")
     @classmethod
-    def determine_role(cls, value: Optional[str], info) -> str: #here info means getting info from the userBase class that we are inhriting from
+    def determine_role(cls, data: dict) -> dict:
         # Prevent self-registering as ADMIN
-        email = info.data.get("email", "")
+        email = data.get("email", "")
         username_part = email.split("@")[0].lower() if "@" in email else ""
 
         if username_part.startswith("support."):
-            return "SUPPORT"
-        return "EMPLOYEE"
+            data["role"] = "SUPPORT"
+        else:
+            data["role"] = "EMPLOYEE"
+        return data
 
 # 3. Login Schema
 class UserLogin(BaseModel):

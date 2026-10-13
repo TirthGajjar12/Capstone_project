@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from app.config import settings
 
 # 1. Create the SQLAlchemy Engine
-# pool_pre_ping=True checks if the MySQL connection is still alive before using it
+# pool_pre_ping=True checks if the PostgreSQL connection is still alive before using it
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,

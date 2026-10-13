@@ -59,6 +59,19 @@ class Ticket(Base):
     asset = relationship("Asset")
     history = relationship("TicketHistory", back_populates="ticket", cascade="all, delete-orphan")
 
+    @property
+    def ticket_id(self) -> str:
+        return self.ticket_number
+
+    @property
+    def created_by_name(self) -> Optional[str]:
+        return self.created_by.full_name if self.created_by else None
+
+    @property
+    def assigned_to_name(self) -> Optional[str]:
+        return self.assigned_to.full_name if self.assigned_to else None
+
+
 
 class TicketHistory(Base):
     __tablename__ = "ticket_history"

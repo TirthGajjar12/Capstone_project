@@ -1,6 +1,7 @@
 from fastapi import Request
 from fastapi import FastAPI, Depends
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.config import settings
@@ -26,6 +27,15 @@ from app.api.ws import router as ws_router
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.APP_NAME)
+
+# CORS middleware — allows any frontend origin to consume the API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Restrict to specific domains in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Register our routes
 app.include_router(auth_router)

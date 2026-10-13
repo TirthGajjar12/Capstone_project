@@ -24,7 +24,7 @@ def stream_tickets_csv(db: Session) -> Generator[str, None, None]:
 
         row = (
             f'"{t.ticket_number}",'
-            f'"{t.title.replace('"', '""')}",'
+            f'"{t.title.replace(chr(34), chr(34)*2)}",'
             f'"{t.category.value}",'
             f'"{t.priority.value}",'
             f'"{t.status.value}",'

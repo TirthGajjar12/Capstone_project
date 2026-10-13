@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     @property #we use @property when we want to access a method like an attribute, without parentheses
     def database_url(self) -> str:
-        """Constructs MySQL SQLAlchemy connection string."""
+        """Constructs PostgreSQL SQLAlchemy connection string."""
         return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 settings = Settings()

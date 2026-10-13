@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 from typing import Optional, List
 from datetime import datetime, timezone
 from app.models.ticket import TicketCategory, TicketPriority, TicketStatus
@@ -44,14 +44,18 @@ class TicketHistoryResponse(BaseModel):
 class TicketResponse(TicketBase):
     id: int
     ticket_number: str
+    ticket_id: Optional[str] = None
     category: TicketCategory
     priority: TicketPriority
     status: TicketStatus
     created_by_id: int
     created_by: Optional[UserResponse] = None
+    created_by_name: Optional[str] = None
     assigned_to_id: Optional[int] = None
     assigned_to: Optional[UserResponse] = None
+    assigned_to_name: Optional[str] = None
     asset_id: Optional[int] = None
+    asset: Optional[AssetResponse] = None
     
     sla_deadline: datetime
     resolved_at: Optional[datetime] = None
@@ -62,11 +66,20 @@ class TicketResponse(TicketBase):
     updated_at: Optional[datetime] = None
     history: List[TicketHistoryResponse] = []
 
-    # Dynamic computed properties for SLA
+    # Dynamic computed property for SLA — serialized in JSON via Pydantic V2
+    @computed_field
     @property
     def is_sla_breached(self) -> bool:
+        now = datetime.now(timezone.utc)
+        deadline = self.sla_deadline
+        # Normalize naive datetimes (e.g., from SQLite in tests) to UTC
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
         if self.resolved_at:
-            return self.resolved_at > self.sla_deadline
-        return datetime.now(timezone.utc) > self.sla_deadline
+            resolved = self.resolved_at
+            if resolved.tzinfo is None:
+                resolved = resolved.replace(tzinfo=timezone.utc)
+            return resolved > deadline
+        return now > deadline
 
     model_config = ConfigDict(from_attributes=True)
