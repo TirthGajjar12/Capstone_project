@@ -57,7 +57,7 @@ export const api = {
  */
 export const wsService = {
   connect(onMessage: (data: unknown) => void, onError?: (error: unknown) => void) {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/notifications';
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event: MessageEvent) => {

@@ -53,7 +53,6 @@ const TicketForm: React.FC = () => {
         description: description.trim(),
         category,
         priority,
-        created_by: user?.id,
         asset_id: selectedAssetId ? Number(selectedAssetId) : undefined,
       });
       navigate('/tickets');

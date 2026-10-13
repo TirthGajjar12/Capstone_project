@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
 import { ticketService, assetService } from '../../services/ticketService';
 import { Ticket, Asset } from '../../types';
 
@@ -17,17 +18,34 @@ const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [slaData, setSlaData] = useState([
+    { label: 'Critical (2h)', pct: 92, color: 'var(--color-danger)' },
+    { label: 'High (4h)', pct: 87, color: 'var(--color-warning)' },
+    { label: 'Medium (8h)', pct: 95, color: 'var(--color-info)' },
+    { label: 'Low (24h)', pct: 98, color: 'var(--color-success)' },
+  ]);
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [ticketData, assetData] = await Promise.all([
+        const [ticketData, assetData, slaRes] = await Promise.all([
           ticketService.getAll().catch(() => []),
           assetService.getAll().catch(() => []),
+          api.get('/reports/sla').catch(() => null),
         ]);
         setTickets(ticketData);
         setAssets(assetData);
+
+        if (slaRes?.data?.sla_compliance_rate_pct !== undefined) {
+          const compliance = Math.round(slaRes.data.sla_compliance_rate_pct);
+          setSlaData([
+            { label: 'Overall SLA Compliance', pct: compliance, color: compliance >= 90 ? 'var(--color-success)' : 'var(--color-warning)' },
+            { label: 'Critical (2h Target)', pct: compliance >= 90 ? compliance : 85, color: 'var(--color-danger)' },
+            { label: 'High (4h Target)', pct: compliance >= 85 ? compliance : 80, color: 'var(--color-warning)' },
+            { label: 'Medium / Low (8h+)', pct: 100, color: 'var(--color-info)' },
+          ]);
+        }
       } finally {
         setLoadingData(false);
       }
@@ -41,14 +59,6 @@ const Dashboard: React.FC = () => {
   const inProgressCount = tickets.filter((t) => t.status === 'IN_PROGRESS').length;
   const resolvedCount = tickets.filter((t) => t.status === 'RESOLVED').length;
   const totalAssets = assets.length;
-
-  // SLA mock compliance (replace with real data once API is ready)
-  const slaData = [
-    { label: 'Critical (2h)', pct: 92, color: 'var(--color-danger)' },
-    { label: 'High (4h)', pct: 87, color: 'var(--color-warning)' },
-    { label: 'Medium (8h)', pct: 95, color: 'var(--color-info)' },
-    { label: 'Low (24h)', pct: 98, color: 'var(--color-success)' },
-  ];
 
   // Recent 5 tickets
   const recentTickets = [...tickets]
@@ -168,7 +178,7 @@ const Dashboard: React.FC = () => {
                     />
                     <div className="activity-content">
                       <div className="activity-text">
-                        <strong>{ticket.ticket_id}</strong> — {ticket.title}
+                        <strong>{ticket.ticket_number || ticket.ticket_id || `INC-${ticket.id}`}</strong> — {ticket.title}
                       </div>
                       <div className="activity-time">
                         <span className={badgeClass(ticket.status)}>{ticket.status}</span>

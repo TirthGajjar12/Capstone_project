@@ -85,6 +85,15 @@ const AssetList: React.FC = () => {
     return null;
   };
 
+  const isAssignedToMe = (asset: Asset) => {
+    if (!user) return false;
+    if (asset.assigned_to_id === user.id) return true;
+    if (typeof asset.assigned_to === 'object' && asset.assigned_to !== null) {
+      return (asset.assigned_to as any).id === user.id;
+    }
+    return asset.assigned_to === user.id;
+  };
+
   const handleAssign = async (assetId: number) => {
     const targetUserId = selectedUserForAsset[assetId];
     if (!targetUserId) {
@@ -228,7 +237,7 @@ const AssetList: React.FC = () => {
                         {assignedName ? (
                           <span>
                             {assignedName}
-                            {isEmployee && ' (You)'}
+                            {isAssignedToMe(asset) && ' (You)'}
                           </span>
                         ) : (
                           '—'
