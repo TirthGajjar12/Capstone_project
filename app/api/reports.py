@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
-from app.api.deps import require_role
+from app.api.deps import require_role, get_current_user
 from app.models.user import User
 from app.services.report_service import stream_tickets_csv, stream_assets_csv, get_sla_metrics
 
@@ -42,9 +42,10 @@ def export_assets_report(
 @router.get("/sla")
 def get_sla_report(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["ADMIN", "SUPPORT"]))
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get live SLA metrics (compliance rate, average resolution time, breaches).
+    Admins and Support see enterprise-wide metrics; Employees see metrics for their requests.
     """
-    return get_sla_metrics(db)
+    return get_sla_metrics(db, user=current_user)

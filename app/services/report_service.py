@@ -62,13 +62,18 @@ def stream_assets_csv(db: Session) -> Generator[str, None, None]:
         yield row
 
 
-def get_sla_metrics(db: Session) -> dict:
+def get_sla_metrics(db: Session, user: object = None) -> dict:
     """
-    Calculates SLA statistics across all tickets, including active overdue requests.
+    Calculates SLA statistics across tickets, including active overdue requests.
+    If user is an EMPLOYEE, scopes metrics to tickets created by the user.
     """
-    total = db.query(Ticket).count()
-    resolved = db.query(Ticket).filter(Ticket.status.in_([TicketStatus.RESOLVED, TicketStatus.CLOSED])).all()
-    active_tickets = db.query(Ticket).filter(~Ticket.status.in_([TicketStatus.RESOLVED, TicketStatus.CLOSED])).all()
+    query = db.query(Ticket)
+    if user and getattr(user, "role", "") == "EMPLOYEE":
+        query = query.filter(Ticket.created_by_id == getattr(user, "id", None))
+
+    total = query.count()
+    resolved = query.filter(Ticket.status.in_([TicketStatus.RESOLVED, TicketStatus.CLOSED])).all()
+    active_tickets = query.filter(~Ticket.status.in_([TicketStatus.RESOLVED, TicketStatus.CLOSED])).all()
 
     now = datetime.now(timezone.utc)
     breached_resolved_count = 0
@@ -101,9 +106,14 @@ def get_sla_metrics(db: Session) -> dict:
         if resolved else 0.0
     )
 
+    # Compliant tickets are tickets resolved within their SLA deadline
+    compliant_resolved = len(resolved) - breached_resolved_count
+    # Evaluated tickets are all tickets with settled or breached SLA outcomes (resolved + active overdue)
+    total_evaluated = len(resolved) + active_overdue_count
+
     compliance_rate = (
-        round(((len(resolved) - breached_resolved_count) / len(resolved)) * 100, 2)
-        if resolved else 100.0
+        round((compliant_resolved / total_evaluated) * 100, 2)
+        if total_evaluated > 0 else 100.0
     )
 
     return {

@@ -43,14 +43,12 @@ export const Dashboard: React.FC = () => {
       setTickets(ticketData);
       setAssets(assetData);
 
-      // Fetch real SLA report if staff
-      if (isStaff) {
-        try {
-          const res = await api.get('/reports/sla');
-          setSlaData(res.data);
-        } catch {
-          setSlaData(null);
-        }
+      // Fetch live SLA report from backend (scoped to user role: enterprise for staff, personal for employee)
+      try {
+        const res = await api.get('/reports/sla');
+        setSlaData(res.data);
+      } catch {
+        setSlaData(null);
       }
     } catch (err: any) {
       const msg = err?.response?.data?.detail || err?.message || 'Unable to connect to the server or load dashboard data.';
@@ -62,7 +60,7 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [user, isStaff]);
+  }, [user]);
 
   useWebSocket(() => {
     fetchData();
@@ -83,10 +81,40 @@ export const Dashboard: React.FC = () => {
   const mediumCount = tickets.filter((t) => t.priority === 'MEDIUM').length;
   const lowCount = tickets.filter((t) => t.priority === 'LOW').length;
 
-  const resolutionRate = totalTickets > 0 ? Math.round((resolvedCount / totalTickets) * 100) : 100;
-  const complianceRate = slaData && slaData.sla_compliance_rate_pct != null
-    ? Math.round(slaData.sla_compliance_rate_pct)
-    : null;
+  const resolutionRate = totalTickets > 0 ? Math.round((resolvedCount / totalTickets) * 100) : 0;
+
+  // Accurate SLA Compliance Rate: use backend response or calculate from tickets (including active overdue)
+  const complianceRate = (() => {
+    if (slaData && typeof slaData.sla_compliance_rate_pct === 'number') {
+      return Math.round(slaData.sla_compliance_rate_pct);
+    }
+    const resolved = tickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED');
+    const active = tickets.filter((t) => t.status !== 'RESOLVED' && t.status !== 'CLOSED');
+    const nowMs = Date.now();
+    const isBreached = (t: Ticket) => {
+      if (typeof t.is_sla_breached === 'boolean') return t.is_sla_breached;
+      if (!t.sla_deadline) return false;
+      const deadline = new Date(t.sla_deadline).getTime();
+      if (t.resolved_at) return new Date(t.resolved_at).getTime() > deadline;
+      return nowMs > deadline;
+    };
+    const breachedResolved = resolved.filter(isBreached).length;
+    const activeOverdue = active.filter(isBreached).length;
+    const evaluated = resolved.length + activeOverdue;
+    const compliant = resolved.length - breachedResolved;
+    if (evaluated > 0) return Math.round((compliant / evaluated) * 100);
+    return tickets.length > 0 ? 100 : null;
+  })();
+
+  const activeOverdueCount = slaData?.active_overdue_tickets ?? (() => {
+    const active = tickets.filter((t) => t.status !== 'RESOLVED' && t.status !== 'CLOSED');
+    const nowMs = Date.now();
+    return active.filter((t) => {
+      if (typeof t.is_sla_breached === 'boolean') return t.is_sla_breached;
+      if (!t.sla_deadline) return false;
+      return nowMs > new Date(t.sla_deadline).getTime();
+    }).length;
+  })();
 
   // Recent tickets (latest 4)
   const recentTickets = [...tickets]
@@ -248,7 +276,9 @@ export const Dashboard: React.FC = () => {
             <span className="metric-value resolved-number">{resolvedCount}</span>
             <span className="metric-unit resolved-unit">closed</span>
           </div>
-          <div className="metric-subtext">{resolutionRate}% resolution rate</div>
+          <div className="metric-subtext">
+            {totalTickets > 0 ? `${resolutionRate}% resolution rate` : 'No tickets logged'}
+          </div>
         </div>
 
         <div className="dash-metric-card" onClick={() => navigate('/assets')} style={{ cursor: 'pointer' }}>
@@ -423,104 +453,119 @@ export const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Service & SLA Metrics Card (Only shown to IT Staff & Admins) */}
-          {isStaff && (
-            <div className="warm-card sla-card">
-              <div className="warm-card-header">
-                <div className="warm-card-title-group">
-                  <span className="warm-card-icon">📊</span>
-                  <h2 className="warm-card-title">Service & SLA Metrics</h2>
-                </div>
-                <span className="sla-period-tag" style={!slaData ? { background: '#f3f4f6', color: '#6b7280' } : undefined}>
-                  {slaData ? 'Live Data' : 'Report Unavailable'}
-                </span>
+          {/* Service & SLA Metrics Card (Rendered for both Admin/Staff and Employees with accurate rates) */}
+          <div className="warm-card sla-card">
+            <div className="warm-card-header">
+              <div className="warm-card-title-group">
+                <span className="warm-card-icon">📊</span>
+                <h2 className="warm-card-title">Service & SLA Metrics</h2>
               </div>
+              <span className="sla-period-tag" style={!slaData ? { background: '#f3f4f6', color: '#6b7280' } : undefined}>
+                {isEmployee ? 'My Requests SLA' : 'Enterprise SLA'}
+              </span>
+            </div>
 
-              <div style={{ marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>SLA Compliance Rate</span>
-                  {complianceRate !== null ? (
-                    <span style={{ fontSize: '1.25rem', fontWeight: 700, color: complianceRate >= 80 ? '#10b981' : '#f59e0b' }}>
-                      {complianceRate}%
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#9ca3af' }}>
-                      Data Unavailable
-                    </span>
-                  )}
-                </div>
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>SLA Compliance Rate</span>
                 {complianceRate !== null ? (
-                  <div className="sla-progress-track">
-                    <div
-                      className="sla-progress-fill"
-                      style={{
-                        width: `${complianceRate}%`,
-                        backgroundColor: complianceRate >= 80 ? '#10b981' : '#f59e0b',
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: '0.2rem' }}>
-                    No SLA performance data has been calculated yet.
-                  </div>
-                )}
-                {slaData && slaData.avg_resolution_time_hours > 0 && (
-                  <div style={{ fontSize: '0.78rem', color: '#78716c', marginTop: '0.4rem' }}>
-                    Average resolution time: <strong>{slaData.avg_resolution_time_hours} hours</strong>
-                  </div>
-                )}
-                {slaData && (slaData.active_overdue_tickets ?? 0) > 0 && (
-                  <div
+                  <span
                     style={{
-                      fontSize: '0.78rem',
-                      color: '#dc2626',
-                      fontWeight: 600,
-                      marginTop: '0.4rem',
-                      background: 'rgba(239, 68, 68, 0.08)',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '4px',
+                      fontSize: '1.25rem',
+                      fontWeight: 700,
+                      color: complianceRate >= 80 ? '#10b981' : complianceRate >= 50 ? '#f59e0b' : '#ef4444',
                     }}
                   >
-                    ⚠️ {slaData.active_overdue_tickets} active ticket(s) currently past SLA deadline
-                  </div>
+                    {complianceRate}%
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#9ca3af' }}>
+                    {totalTickets === 0 ? 'No requests yet' : 'Data Unavailable'}
+                  </span>
                 )}
               </div>
-
-              {/* Real Priority Distribution from tickets */}
-              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
-                  Tickets by Priority
+              {complianceRate !== null ? (
+                <div className="sla-progress-track">
+                  <div
+                    className="sla-progress-fill"
+                    style={{
+                      width: `${complianceRate}%`,
+                      backgroundColor: complianceRate >= 80 ? '#10b981' : complianceRate >= 50 ? '#f59e0b' : '#ef4444',
+                    }}
+                  />
                 </div>
+              ) : (
+                <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: '0.2rem' }}>
+                  {totalTickets === 0
+                    ? 'Submit a ticket to start tracking SLA performance.'
+                    : 'No SLA performance data has been calculated yet.'}
+                </div>
+              )}
+              {slaData && slaData.avg_resolution_time_hours > 0 && (
+                <div style={{ fontSize: '0.78rem', color: '#78716c', marginTop: '0.4rem' }}>
+                  Average resolution time: <strong>{slaData.avg_resolution_time_hours} hours</strong>
+                </div>
+              )}
+              {activeOverdueCount > 0 && (
+                <div
+                  style={{
+                    fontSize: '0.78rem',
+                    color: '#dc2626',
+                    fontWeight: 600,
+                    marginTop: '0.4rem',
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '4px',
+                  }}
+                >
+                  ⚠️ {activeOverdueCount} active ticket(s) currently past SLA deadline
+                </div>
+              )}
+            </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ color: '#ef4444' }}>●</span> Critical
-                    </span>
-                    <strong>{criticalCount}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ color: '#f59e0b' }}>●</span> High
-                    </span>
-                    <strong>{highCount}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ color: '#3b82f6' }}>●</span> Medium
-                    </span>
-                    <strong>{mediumCount}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ color: '#10b981' }}>●</span> Low
-                    </span>
-                    <strong>{lowCount}</strong>
-                  </div>
+            {/* Real Priority Distribution from tickets */}
+            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+              <div
+                style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                {isEmployee ? 'My Tickets by Priority' : 'Tickets by Priority'}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ color: '#ef4444' }}>●</span> Critical
+                  </span>
+                  <strong>{criticalCount}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ color: '#f59e0b' }}>●</span> High
+                  </span>
+                  <strong>{highCount}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ color: '#3b82f6' }}>●</span> Medium
+                  </span>
+                  <strong>{mediumCount}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ color: '#10b981' }}>●</span> Low
+                  </span>
+                  <strong>{lowCount}</strong>
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Strictly Role-Tailored Quick Actions Card */}
           <div className="warm-card" style={{ padding: '1.25rem' }}>
