@@ -6,27 +6,36 @@ import { WebSocketMessage } from '../types';
 /**
  * Custom hook that manages a WebSocket connection for real-time events.
  * Connects when the user is authenticated and disconnects on unmount.
+ *
+ * The onMessage callback is stored in a ref so that changes to it never
+ * restart the WebSocket connection — only a user change does.
  */
 export default function useWebSocket(onMessage?: (msg: WebSocketMessage) => void) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
 
-  const handleMessage = useCallback(
-    (data: unknown) => {
-      const msg = data as WebSocketMessage;
-      onMessage?.(msg);
-    },
-    [onMessage],
-  );
+  // Always keep the latest callback in a ref without triggering effect re-runs
+  const onMessageRef = useRef(onMessage);
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  });
+
+  const send = useCallback((data: unknown) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data));
+    }
+  }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !token) return;
 
     const ws = wsService.connect(
+      token,
       (data) => {
         setConnected(true);
-        handleMessage(data);
+        // Call through the ref — always the latest callback, no dep needed
+        onMessageRef.current?.(data as WebSocketMessage);
       },
       (error) => {
         console.error('WebSocket error:', error);
@@ -44,13 +53,7 @@ export default function useWebSocket(onMessage?: (msg: WebSocketMessage) => void
       wsRef.current = null;
       setConnected(false);
     };
-  }, [user, handleMessage]);
-
-  const send = useCallback((data: unknown) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(data));
-    }
-  }, []);
+  }, [user, token]); // ← only restarts when auth state changes
 
   return { ws: wsRef.current, connected, send };
 }

@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.database.connection import get_db
 from app.models.asset import Asset, AssetAssignment, AssetStatus, AssetType
 from app.models.user import User
-from app.schemas.asset import AssetCreate, AssetUpdate, AssetAssign, AssetResponse
+from app.schemas.asset import AssetCreate, AssetAssign, AssetResponse
 from app.api.deps import get_current_user, require_role
 
 router = APIRouter(prefix="/assets", tags=["Assets"])
@@ -129,6 +129,11 @@ def assign_asset(
     target_user = db.query(User).filter(User.id == assign_in.user_id).first()
     if not target_user or not target_user.is_active:
         raise HTTPException(status_code=404, detail="Target user not found or inactive.")
+    if target_user.role not in ["EMPLOYEE", "SUPPORT"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Hardware assets can only be assigned to active employees or support staff."
+        )
 
     # Update asset
     asset.assigned_to_id = target_user.id

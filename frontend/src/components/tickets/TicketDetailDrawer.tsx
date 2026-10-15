@@ -296,7 +296,11 @@ export const TicketDetailDrawer: React.FC<TicketDetailDrawerProps> = ({
                       }}
                     />
                     <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                      {h.new_status ? `Status changed to ${h.new_status}` : 'Action performed'}
+                      {h.new_status
+                        ? (h.previous_status || h.old_status)
+                          ? `Status changed: ${h.previous_status || h.old_status} → ${h.new_status}`
+                          : `Status set to ${h.new_status}`
+                        : 'Action performed'}
                     </div>
                     {h.comment && (
                       <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '0.1rem' }}>

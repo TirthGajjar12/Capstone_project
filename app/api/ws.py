@@ -1,20 +1,55 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
+from fastapi.websockets import WebSocketState
+import jwt
+from jwt.exceptions import InvalidTokenError
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.database.connection import get_db
+from app.models.user import User
 from app.services.websocket_manager import ws_manager
 
 router = APIRouter(tags=["WebSockets"])
 
+
 @router.websocket("/ws/notifications")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: str = Query(..., description="JWT access token for authentication"),
+):
     """
-    WebSocket endpoint for real-time ticket alerts and dashboard notifications.
-    Clients connect to: ws://127.0.0.1:8000/ws/notifications
+    Authenticated WebSocket endpoint for real-time ticket alerts.
+    Clients must pass a valid JWT as ?token=<jwt> in the query string.
+    Clients connect to: ws://host/ws/notifications?token=<jwt>
     """
+    # --- JWT Authentication ---
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+    except InvalidTokenError:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    # Optional: verify the user still exists and is active in DB
+    db: Session = next(get_db())
+    try:
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        if not user or not user.is_active:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+    finally:
+        db.close()
+
+    # --- Accept and register the authenticated connection ---
     await ws_manager.connect(websocket)
     try:
-        # Keep connection alive and listen for optional ping/pong messages
+        # Keep connection alive; handle optional ping/pong from client
         while True:
             data = await websocket.receive_text()
-            # Echo or acknowledge incoming client messages
-            await websocket.send_text(f'{{"received": "{data}"}}')
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_text(f'{{"received": "{data}"}}')
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)

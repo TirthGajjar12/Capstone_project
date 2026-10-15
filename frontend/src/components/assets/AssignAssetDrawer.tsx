@@ -35,8 +35,8 @@ export const AssignAssetDrawer: React.FC<AssignAssetDrawerProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const results = await userService.search(search, 15);
-        setUsers(results);
+        const results = await userService.search(search, 15, 'EMPLOYEE');
+        setUsers(results.filter((u) => u.role === 'EMPLOYEE'));
       } catch (err: any) {
         setError('Failed to load employee directory.');
         setUsers([]);

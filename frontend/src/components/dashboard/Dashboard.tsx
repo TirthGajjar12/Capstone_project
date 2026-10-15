@@ -22,35 +22,42 @@ export const Dashboard: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [slaData, setSlaData] = useState<SlaData | null>(null);
   const [loadingData, setLoadingData] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [requestModalOpen, setRequestModalOpen] = useState(false);
 
   const isStaff = user?.role === 'ADMIN' || user?.role === 'SUPPORT';
   const isAdmin = user?.role === 'ADMIN';
   const isEmployee = user?.role === 'EMPLOYEE';
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [ticketData, assetData] = await Promise.all([
-          ticketService.getAll().catch(() => []),
-          assetService.getAll().catch(() => []),
-        ]);
-        setTickets(ticketData);
-        setAssets(assetData);
+  const fetchData = async () => {
+    setLoadingData(true);
+    setFetchError(null);
+    try {
+      const [ticketData, assetData] = await Promise.all([
+        ticketService.getAll(),
+        assetService.getAll(),
+      ]);
+      setTickets(ticketData);
+      setAssets(assetData);
 
-        // Fetch real SLA report if staff
-        if (isStaff) {
-          try {
-            const res = await api.get('/reports/sla');
-            setSlaData(res.data);
-          } catch {
-            setSlaData(null);
-          }
+      // Fetch real SLA report if staff
+      if (isStaff) {
+        try {
+          const res = await api.get('/reports/sla');
+          setSlaData(res.data);
+        } catch {
+          setSlaData(null);
         }
-      } finally {
-        setLoadingData(false);
       }
-    };
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Unable to connect to the server or load dashboard data.';
+      setFetchError(msg);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [user, isStaff]);
 
@@ -70,7 +77,9 @@ export const Dashboard: React.FC = () => {
   const lowCount = tickets.filter((t) => t.priority === 'LOW').length;
 
   const resolutionRate = totalTickets > 0 ? Math.round((resolvedCount / totalTickets) * 100) : 100;
-  const complianceRate = slaData ? Math.round(slaData.sla_compliance_rate_pct) : resolutionRate;
+  const complianceRate = slaData && slaData.sla_compliance_rate_pct != null
+    ? Math.round(slaData.sla_compliance_rate_pct)
+    : null;
 
   // Recent tickets (latest 4)
   const recentTickets = [...tickets]
@@ -163,6 +172,39 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* API / Server Connection Error Alert */}
+      {fetchError && (
+        <div
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #f87171',
+            color: '#991b1b',
+            borderRadius: '8px',
+            padding: '0.85rem 1.25rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+            <div style={{ fontSize: '0.88rem' }}>
+              <strong>Failed to load workspace data:</strong> {fetchError}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-warm-secondary"
+            onClick={fetchData}
+            style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+          >
+            🔄 Retry
+          </button>
+        </div>
+      )}
 
       {/* ==================== 2. STAT CARDS ROW ==================== */}
       <div className="dash-metrics-grid">
@@ -344,73 +386,119 @@ export const Dashboard: React.FC = () => {
 
         {/* Right Column: Real SLA Metrics & Tailored Quick Actions */}
         <div className="dash-right-column">
-          {/* Real Metrics Card */}
-          <div className="warm-card sla-card">
-            <div className="warm-card-header">
-              <div className="warm-card-title-group">
-                <span className="warm-card-icon">📊</span>
-                <h2 className="warm-card-title">Service & SLA Metrics</h2>
+          {/* Employee Support Hub Card (Only shown to Employees) */}
+          {isEmployee && (
+            <div className="warm-card" style={{ padding: '1.25rem' }}>
+              <div className="warm-card-header" style={{ marginBottom: '0.85rem' }}>
+                <div className="warm-card-title-group">
+                  <span className="warm-card-icon">💡</span>
+                  <h2 className="warm-card-title">Employee Support Hub</h2>
+                </div>
               </div>
-              <span className="sla-period-tag">Live Data</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div style={{ background: 'var(--color-bg-secondary, #fafaf9)', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e7ded4' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--color-text-primary)', marginBottom: '0.2rem' }}>
+                    ⚡ Intelligent Triage
+                  </div>
+                  <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Submit requests describing your issue. Automated NLP triage assigns appropriate priority and routes urgent requests for expedited attention.
+                  </div>
+                </div>
+                <div style={{ background: 'var(--color-bg-secondary, #fafaf9)', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e7ded4' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--color-text-primary)', marginBottom: '0.2rem' }}>
+                    📦 Equipment Requests
+                  </div>
+                  <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    Need a replacement laptop, external monitor, or peripherals? Use "Request Equipment" to submit a hardware allocation request.
+                  </div>
+                </div>
+              </div>
             </div>
+          )}
 
-            <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>SLA Compliance Rate</span>
-                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: complianceRate >= 80 ? '#10b981' : '#f59e0b' }}>
-                  {complianceRate}%
+          {/* Service & SLA Metrics Card (Only shown to IT Staff & Admins) */}
+          {isStaff && (
+            <div className="warm-card sla-card">
+              <div className="warm-card-header">
+                <div className="warm-card-title-group">
+                  <span className="warm-card-icon">📊</span>
+                  <h2 className="warm-card-title">Service & SLA Metrics</h2>
+                </div>
+                <span className="sla-period-tag" style={!slaData ? { background: '#f3f4f6', color: '#6b7280' } : undefined}>
+                  {slaData ? 'Live Data' : 'Report Unavailable'}
                 </span>
               </div>
-              <div className="sla-progress-track">
-                <div
-                  className="sla-progress-fill"
-                  style={{
-                    width: `${complianceRate}%`,
-                    backgroundColor: complianceRate >= 80 ? '#10b981' : '#f59e0b',
-                  }}
-                />
-              </div>
-              {slaData && slaData.avg_resolution_time_hours > 0 && (
-                <div style={{ fontSize: '0.78rem', color: '#78716c', marginTop: '0.4rem' }}>
-                  Average resolution time: <strong>{slaData.avg_resolution_time_hours} hours</strong>
-                </div>
-              )}
-            </div>
 
-            {/* Real Priority Distribution from tickets */}
-            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
-                Tickets by Priority
+              <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>SLA Compliance Rate</span>
+                  {complianceRate !== null ? (
+                    <span style={{ fontSize: '1.25rem', fontWeight: 700, color: complianceRate >= 80 ? '#10b981' : '#f59e0b' }}>
+                      {complianceRate}%
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#9ca3af' }}>
+                      Data Unavailable
+                    </span>
+                  )}
+                </div>
+                {complianceRate !== null ? (
+                  <div className="sla-progress-track">
+                    <div
+                      className="sla-progress-fill"
+                      style={{
+                        width: `${complianceRate}%`,
+                        backgroundColor: complianceRate >= 80 ? '#10b981' : '#f59e0b',
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: '0.2rem' }}>
+                    No SLA performance data has been calculated yet.
+                  </div>
+                )}
+                {slaData && slaData.avg_resolution_time_hours > 0 && (
+                  <div style={{ fontSize: '0.78rem', color: '#78716c', marginTop: '0.4rem' }}>
+                    Average resolution time: <strong>{slaData.avg_resolution_time_hours} hours</strong>
+                  </div>
+                )}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ color: '#ef4444' }}>●</span> Critical
-                  </span>
-                  <strong>{criticalCount}</strong>
+              {/* Real Priority Distribution from tickets */}
+              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
+                  Tickets by Priority
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ color: '#f59e0b' }}>●</span> High
-                  </span>
-                  <strong>{highCount}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ color: '#3b82f6' }}>●</span> Medium
-                  </span>
-                  <strong>{mediumCount}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ color: '#10b981' }}>●</span> Low
-                  </span>
-                  <strong>{lowCount}</strong>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ color: '#ef4444' }}>●</span> Critical
+                    </span>
+                    <strong>{criticalCount}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ color: '#f59e0b' }}>●</span> High
+                    </span>
+                    <strong>{highCount}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ color: '#3b82f6' }}>●</span> Medium
+                    </span>
+                    <strong>{mediumCount}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ color: '#10b981' }}>●</span> Low
+                    </span>
+                    <strong>{lowCount}</strong>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Strictly Role-Tailored Quick Actions Card */}
           <div className="warm-card" style={{ padding: '1.25rem' }}>

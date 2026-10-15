@@ -55,6 +55,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RoleRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles: string[] }) {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="spinner" />
+        Checking permissions…
+      </div>
+    );
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -77,12 +96,26 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/tickets" element={<TicketList />} />
-              <Route path="/tickets/assign" element={<TicketAssignment />} />
+              <Route
+                path="/tickets/assign"
+                element={
+                  <RoleRoute allowedRoles={['ADMIN']}>
+                    <TicketAssignment />
+                  </RoleRoute>
+                }
+              />
               <Route path="/tickets/assignment" element={<Navigate to="/tickets/assign" replace />} />
               <Route path="/tickets/create" element={<TicketForm />} />
               <Route path="/assets" element={<AssetList />} />
               <Route path="/inventory/available" element={<AssetList availableOnly={true} />} />
-              <Route path="/assets/create" element={<AssetForm />} />
+              <Route
+                path="/assets/create"
+                element={
+                  <RoleRoute allowedRoles={['ADMIN']}>
+                    <AssetForm />
+                  </RoleRoute>
+                }
+              />
               <Route path="/home" element={<PageLoader><HomePage /></PageLoader>} />
             </Route>
 

@@ -17,10 +17,15 @@ def stream_tickets_csv(db: Session) -> Generator[str, None, None]:
 
     for t in tickets:
         # Calculate if SLA was breached
-        if t.resolved_at:
-            breached = t.resolved_at > t.sla_deadline
+        if t.sla_deadline:
+            deadline = t.sla_deadline if t.sla_deadline.tzinfo else t.sla_deadline.replace(tzinfo=timezone.utc)
+            if t.resolved_at:
+                resolved = t.resolved_at if t.resolved_at.tzinfo else t.resolved_at.replace(tzinfo=timezone.utc)
+                breached = resolved > deadline
+            else:
+                breached = datetime.now(timezone.utc) > deadline
         else:
-            breached = datetime.now(timezone.utc) > t.sla_deadline
+            breached = False
 
         row = (
             f'"{t.ticket_number}",'

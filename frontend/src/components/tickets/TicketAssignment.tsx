@@ -1,9 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { ticketService } from '../../services/ticketService';
 import { Ticket } from '../../types';
 import AssignTicketDrawer from './AssignTicketDrawer';
 
 export const TicketAssignment: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && user.role !== 'ADMIN') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
+
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -41,12 +52,12 @@ export const TicketAssignment: React.FC = () => {
 
   // Counts
   const totalCount = tickets.length;
-  const unassignedTickets = tickets.filter(
-    (t) => (!t.assigned_to && !t.assigned_to_id) || t.status === 'OPEN'
-  );
-  const unassignedCount = unassignedTickets.length;
+  const unassignedCount = tickets.filter(
+    (t) => !t.assigned_to && !t.assigned_to_id && t.status !== 'CLOSED' && t.status !== 'RESOLVED'
+  ).length;
   const activeCount = tickets.filter(
-    (t) => t.status === 'IN_PROGRESS' || t.status === 'ASSIGNED'
+    (t) => (Boolean(t.assigned_to || t.assigned_to_id) || t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS') &&
+      t.status !== 'CLOSED' && t.status !== 'RESOLVED'
   ).length;
   const highPriorityCount = tickets.filter(
     (t) => (t.priority === 'CRITICAL' || t.priority === 'HIGH') && t.status !== 'CLOSED' && t.status !== 'RESOLVED'
@@ -54,16 +65,16 @@ export const TicketAssignment: React.FC = () => {
 
   // Filter tickets
   const filtered = tickets.filter((t) => {
-    // Exclude closed from main triage view unless ALL tab is active
-    if (tabFilter !== 'ALL' && t.status === 'CLOSED') {
+    // Exclude closed and resolved from triage queues unless ALL tab is active
+    if (tabFilter !== 'ALL' && (t.status === 'CLOSED' || t.status === 'RESOLVED')) {
       return false;
     }
 
     if (tabFilter === 'UNASSIGNED') {
-      const isUnassigned = (!t.assigned_to && !t.assigned_to_id) || t.status === 'OPEN';
+      const isUnassigned = !t.assigned_to && !t.assigned_to_id;
       if (!isUnassigned) return false;
     } else if (tabFilter === 'ASSIGNED') {
-      const isAssigned = (t.assigned_to || t.assigned_to_id) && t.status !== 'OPEN';
+      const isAssigned = Boolean(t.assigned_to || t.assigned_to_id) || t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS';
       if (!isAssigned) return false;
     } else if (tabFilter === 'HIGH_PRIORITY') {
       if (t.priority !== 'CRITICAL' && t.priority !== 'HIGH') return false;

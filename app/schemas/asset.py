@@ -11,17 +11,12 @@ class AssetBase(BaseModel):
     brand: str
     model: str
     serial_number: str
-    purchase_date: Optional[str] = None
 
 # 2. Schema for Creating an Asset (Admin only)
 class AssetCreate(AssetBase):
     pass
 
 # 3. Schema for Updating Asset Status/Details
-class AssetUpdate(BaseModel):
-    brand: Optional[str] = None
-    model: Optional[str] = None
-    status: Optional[AssetStatus] = None
 
 # 4. Schema for Assigning an Asset to a User
 class AssetAssign(BaseModel):

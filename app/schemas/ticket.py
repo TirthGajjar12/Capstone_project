@@ -33,6 +33,7 @@ class TicketResolve(BaseModel):
 # 6. Ticket History Response
 class TicketHistoryResponse(BaseModel):
     id: int
+    ticket_id: Optional[int] = None
     changed_by_id: int
     previous_status: Optional[str] = None
     new_status: Optional[str] = None

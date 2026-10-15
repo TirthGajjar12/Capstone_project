@@ -95,14 +95,19 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
 def list_users(
     search: Optional[str] = None,
     role: Optional[str] = None,
+    skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role(["ADMIN", "SUPPORT"]))
 ):
     """
     List active users for ticket assignments and asset allocation.
-    Supports on-demand search by name or email with pagination/limit and optional role filtering.
+    Accessible only to Support Staff and Administrators.
+    Supports on-demand search by name or email with pagination (skip/limit) and role filtering.
     """
+    safe_limit = min(max(1, limit), 100)
+    safe_skip = max(0, skip)
+
     query = db.query(User).filter(User.is_active == True)
     if role and role.strip():
         query = query.filter(User.role == role.strip().upper())
@@ -114,5 +119,6 @@ def list_users(
                 User.email.ilike(search_term)
             )
         )
-    return query.limit(limit).all()
+    return query.offset(safe_skip).limit(safe_limit).all()
+
 

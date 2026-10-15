@@ -107,6 +107,18 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
       return;
     }
 
+    const isMatchedType =
+      !requestedType ||
+      selectedAsset.asset_type?.toLowerCase().includes(requestedType.toLowerCase()) ||
+      requestedType.toLowerCase().includes(selectedAsset.asset_type?.toLowerCase() || '');
+
+    if (!isMatchedType) {
+      const confirmed = window.confirm(
+        `Notice: The selected asset is a "${selectedAsset.asset_type}", but the user requested "${requestedType}". Proceed with this equipment substitution?`
+      );
+      if (!confirmed) return;
+    }
+
     setSubmitting(true);
     setError(null);
 

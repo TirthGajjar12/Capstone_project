@@ -12,7 +12,6 @@ export const AssetForm: React.FC = () => {
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +32,6 @@ export const AssetForm: React.FC = () => {
         brand: brand.trim(),
         model: model.trim(),
         serial_number: serialNumber.trim(),
-        purchase_date: purchaseDate || undefined,
       });
       navigate('/assets');
     } catch (err: any) {
@@ -130,36 +128,20 @@ export const AssetForm: React.FC = () => {
             </div>
           </div>
 
-          <div className="form-grid-2">
-            {/* Serial Number */}
-            <div className="form-group">
-              <label htmlFor="asset-serial" className="form-label">
-                Hardware Serial Number *
-              </label>
-              <input
-                id="asset-serial"
-                className="form-control"
-                type="text"
-                placeholder="e.g. SN-88492019-B"
-                value={serialNumber}
-                onChange={(e) => setSerialNumber(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Purchase Date */}
-            <div className="form-group">
-              <label htmlFor="asset-purchase-date" className="form-label">
-                Procurement / Purchase Date
-              </label>
-              <input
-                id="asset-purchase-date"
-                className="form-control"
-                type="date"
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
-              />
-            </div>
+          {/* Serial Number */}
+          <div className="form-group">
+            <label htmlFor="asset-serial" className="form-label">
+              Hardware Serial Number *
+            </label>
+            <input
+              id="asset-serial"
+              className="form-control"
+              type="text"
+              placeholder="e.g. SN-88492019-B"
+              value={serialNumber}
+              onChange={(e) => setSerialNumber(e.target.value)}
+              required
+            />
           </div>
 
           {/* Form Actions */}

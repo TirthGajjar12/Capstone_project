@@ -236,28 +236,13 @@ function SignupPage() {
                 <Link to="/login" className="warm-signin-link">Sign in</Link>
               </div>
 
-              {/* Trust & Security Badges Footer */}
-              <div className="warm-trust-badges">
-                <span className="warm-trust-soc2">
-                  <span className="soc2-bullet">●</span> SOC2 Type II
-                </span>
-                <span className="warm-trust-dot">·</span>
-                <span>256-bit TLS Encryption</span>
-                <span className="warm-trust-dot">·</span>
-                <span>SSO Ready</span>
-              </div>
             </>
           )}
         </div>
 
-        {/* Outer Legal & Version Footer */}
+        {/* Outer Version Footer */}
         <div className="warm-outer-footer">
-          <div className="warm-outer-links">
-            <a href="#privacy" onClick={(e) => e.preventDefault()}>Privacy Policy</a>
-            <a href="#terms" onClick={(e) => e.preventDefault()}>Terms of Service</a>
-            <a href="#status" onClick={(e) => e.preventDefault()}>System Status</a>
-          </div>
-          <span className="warm-outer-version">v2.4.1</span>
+          <span className="warm-outer-version">ITSM Support Desk · Capstone Project</span>
         </div>
       </div>
     </div>

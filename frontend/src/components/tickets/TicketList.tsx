@@ -7,19 +7,21 @@ import useWebSocket from '../../hooks/useWebSocket';
 import FulfillRequestDrawer from './FulfillRequestDrawer';
 import TicketDetailDrawer from './TicketDetailDrawer';
 
-export const TicketList: React.FC = () => {
+export const TicketList = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [supportStaff, setSupportStaff] = useState<User[]>([]);
+  
   const [search, setSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [supportStaff, setSupportStaff] = useState<User[]>([]);
 
   // Fulfill Hardware Request Drawer State
   const [fulfillTicket, setFulfillTicket] = useState<Ticket | null>(null);
@@ -35,10 +37,13 @@ export const TicketList: React.FC = () => {
 
   const fetchTickets = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await ticketService.getAll();
       setTickets(data);
-    } catch {
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Failed to load tickets from server.';
+      setError(msg);
       setTickets([]);
     } finally {
       setLoading(false);
@@ -350,6 +355,22 @@ export const TicketList: React.FC = () => {
           <div className="dash-loading-state" style={{ padding: '3rem' }}>
             Loading tickets…
           </div>
+        ) : error ? (
+          <div className="dash-empty-tickets" style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
+            <span style={{ fontSize: '2.5rem' }}>⚠️</span>
+            <h3 style={{ margin: '0.75rem 0 0.25rem 0', color: '#dc2626' }}>Failed to Load Tickets</h3>
+            <p style={{ color: 'var(--color-text-secondary)', margin: '0 0 1.25rem 0', fontSize: '0.88rem' }}>
+              {error}
+            </p>
+            <button
+              type="button"
+              className="btn-warm-secondary"
+              onClick={fetchTickets}
+              style={{ margin: '0 auto', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              🔄 Retry Connection
+            </button>
+          </div>
         ) : filteredTickets.length === 0 ? (
           <div className="dash-empty-tickets" style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
             <span style={{ fontSize: '2.5rem' }}>🎫</span>
@@ -498,10 +519,39 @@ export const TicketList: React.FC = () => {
                       </td>
                     )}
                     <td
-                      style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem' }}
+                      style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem' }}
                       title={assignedName || 'Unassigned'}
                     >
-                      {assignedName ? (
+                      {isAdmin && (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') && supportStaff.length > 0 ? (
+                        <select
+                          className="form-control"
+                          style={{
+                            fontSize: '0.74rem',
+                            padding: '0.15rem 0.35rem',
+                            height: '26px',
+                            minWidth: '110px',
+                            maxWidth: '135px',
+                            borderColor: ticket.assigned_to_id ? '#c7d2fe' : '#fed7aa',
+                            background: ticket.assigned_to_id ? '#f5f3ff' : '#fff7ed',
+                            color: ticket.assigned_to_id ? '#4338ca' : '#c2410c',
+                            fontWeight: 600,
+                          }}
+                          value={ticket.assigned_to_id || ''}
+                          disabled={actionLoadingId === ticket.id}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) handleAdminAssign(ticket.id, Number(val));
+                          }}
+                          title="Admin: Dispatch / Reassign engineer"
+                        >
+                          <option value="">(Unassigned)</option>
+                          {supportStaff.map((staff) => (
+                            <option key={staff.id} value={staff.id}>
+                              {staff.full_name.split(' ')[0]} ({staff.role})
+                            </option>
+                          ))}
+                        </select>
+                      ) : assignedName ? (
                         <span style={{ color: isAssignedToMe ? '#6366f1' : 'inherit', fontWeight: isAssignedToMe ? 700 : 500 }}>
                           {assignedName} {isAssignedToMe && '(You)'}
                         </span>
@@ -521,7 +571,7 @@ export const TicketList: React.FC = () => {
                             ticket.title.toLowerCase().includes('request equipment') ||
                             ticket.description.toLowerCase().includes('requested equipment:'));
 
-                        const canTake = (isSupport || isAdmin) && ticket.status === 'OPEN';
+                        const canTake = (isSupport || isAdmin) && ticket.status === 'OPEN' && !ticket.assigned_to_id;
                         const canStart = (isSupport || isAdmin) && ticket.status === 'ASSIGNED' && (isAssignedToMe || isAdmin);
                         const canResolve = (isSupport || isAdmin) && (ticket.status === 'IN_PROGRESS' || ticket.status === 'ASSIGNED') && (isAssignedToMe || isAdmin);
                         const canClose = isEmployee && ticket.status === 'RESOLVED';

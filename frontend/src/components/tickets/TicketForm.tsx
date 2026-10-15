@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ticketService, assetService } from '../../services/ticketService';
-import { TicketCategory, Asset } from '../../types';
+import { Asset } from '../../types';
 
 export const TicketForm: React.FC = () => {
   const { user } = useAuth();
@@ -23,9 +23,6 @@ export const TicketForm: React.FC = () => {
     preselectedAssetName ? `Issue with ${preselectedAssetName}` : ''
   );
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState<TicketCategory>(
-    preselectedAssetId ? 'Hardware' : 'Hardware'
-  );
   const [myAssets, setMyAssets] = useState<Asset[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string>(preselectedAssetId);
   const [submitting, setSubmitting] = useState(false);
@@ -48,11 +45,10 @@ export const TicketForm: React.FC = () => {
     setError(null);
     setSubmitting(true);
     try {
-      // Priority is intentionally omitted: backend rule engine automatically classifies priority & SLA
+      // Category and Priority are automatically determined by backend NLP & rule-based triage
       await ticketService.create({
         title: title.trim(),
         description: description.trim(),
-        category,
         asset_id: selectedAssetId ? Number(selectedAssetId) : undefined,
       });
       navigate('/tickets');
@@ -92,9 +88,6 @@ export const TicketForm: React.FC = () => {
               onChange={(e) => {
                 const val = e.target.value;
                 setSelectedAssetId(val);
-                if (val && category !== 'Hardware') {
-                  setCategory('Hardware');
-                }
                 if (val && !title) {
                   const match = myAssets.find((a) => String(a.id) === val);
                   if (match) {
@@ -136,48 +129,6 @@ export const TicketForm: React.FC = () => {
             />
           </div>
 
-          {/* Category & Auto-Priority Info */}
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label htmlFor="ticket-category" className="form-label">
-                Category *
-              </label>
-              <select
-                id="ticket-category"
-                className="form-control"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as TicketCategory)}
-              >
-                <option value="Hardware">Hardware</option>
-                <option value="Software">Software</option>
-                <option value="Network">Network</option>
-                <option value="Access">Access</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Priority & SLA</label>
-              <div
-                style={{
-                  padding: '0.65rem 0.85rem',
-                  background: 'var(--color-bg-secondary)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '8px',
-                  fontSize: '0.82rem',
-                  color: 'var(--color-text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  height: '38px',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <span>⚡</span>
-                <span><strong>Auto-Triage:</strong> Priority is assigned automatically.</span>
-              </div>
-            </div>
-          </div>
 
           {/* Detailed Description */}
           <div className="form-group">

@@ -24,10 +24,7 @@ export const ticketService = {
     return response.data;
   },
 
-  async update(id: number, data: Partial<Ticket>): Promise<Ticket> {
-    const response = await api.put<Ticket>(`/tickets/${id}`, data);
-    return response.data;
-  },
+
 
   async assign(id: number, userId: number) {
     const response = await api.post(`/tickets/${id}/assign`, { assigned_to_id: userId });
@@ -51,10 +48,7 @@ export const ticketService = {
     return response.data;
   },
 
-  async delete(id: number) {
-    const response = await api.delete(`/tickets/${id}`);
-    return response.data;
-  },
+
 };
 
 /**
@@ -79,10 +73,7 @@ export const assetService = {
     return response.data;
   },
 
-  async update(id: string, data: Partial<Asset>): Promise<Asset> {
-    const response = await api.put<Asset>(`/assets/${id}`, data);
-    return response.data;
-  },
+
 
   async assign(id: string, userId: number) {
     const response = await api.post(`/assets/${id}/assign`, { user_id: userId });
@@ -94,10 +85,7 @@ export const assetService = {
     return response.data;
   },
 
-  async delete(id: string) {
-    const response = await api.delete(`/assets/${id}`);
-    return response.data;
-  },
+
 
   async requestAsset(data: {
     asset_type: string;

@@ -13,8 +13,6 @@ const EQUIPMENT_OPTIONS = [
   { label: 'Keyboard', type: 'Keyboard' },
   { label: 'Mouse / Trackpad', type: 'Mouse' },
   { label: 'Printer / Scanner', type: 'Printer' },
-  { label: 'Docking Station / USB Hub', type: 'Docking Station' },
-  { label: 'Audio Headset / Peripheral', type: 'Headset' },
 ];
 
 export const RequestAssetModal: React.FC<RequestAssetModalProps> = ({

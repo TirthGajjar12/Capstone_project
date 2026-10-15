@@ -24,7 +24,6 @@ export interface Asset {
   brand: string;
   model: string;
   serial_number: string;
-  purchase_date?: string;
   status: AssetStatus;
   assigned_to_id?: number | null;
   assigned_to?: number | User | null;
@@ -54,7 +53,9 @@ export interface Ticket {
   closed_at?: string | null;
   created_at: string;
   sla_deadline: string | null;
+  resolved_at?: string | null;
   sla_breached?: boolean;
+  history?: TicketHistory[];
 }
 
 export interface ActivityLog {
@@ -68,17 +69,34 @@ export interface ActivityLog {
 
 export interface TicketHistory {
   id: number;
-  ticket_id: number;
-  old_status: string | null;
-  new_status: string;
-  changed_by: number;
+  ticket_id?: number;
+  previous_status?: string | null;
+  old_status?: string | null;
+  new_status?: string | null;
+  changed_by_id: number;
+  changed_by?: number;
   changed_by_name?: string;
-  comment: string | null;
+  comment?: string | null;
   created_at: string;
 }
 
+/**
+ * WebSocket message shape — matches the backend broadcast payload:
+ *   { "event": "TICKET_CREATED", "data": { ... } }
+ *
+ * The `event` field uses the exact string values emitted by websocket_manager.py.
+ */
+export type WebSocketEventType =
+  | 'TICKET_CREATED'
+  | 'TICKET_UPDATED'
+  | 'TICKET_STATUS_UPDATED'
+  | 'TICKET_ASSIGNED'
+  | 'TICKET_RESOLVED'
+  | 'TICKET_CLOSED'
+  | 'ASSET_UPDATED'
+  | 'ACTIVITY';
+
 export interface WebSocketMessage {
-  type: 'ticket_created' | 'ticket_updated' | 'ticket_assigned' | 'ticket_resolved' | 'ticket_closed' | 'asset_updated' | 'activity';
-  data: Ticket | Asset | ActivityLog;
-  timestamp: string;
+  event: WebSocketEventType;
+  data: Record<string, unknown>;
 }

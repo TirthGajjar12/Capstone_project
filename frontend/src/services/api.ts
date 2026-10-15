@@ -41,23 +41,26 @@ export const api = {
   patch: apiClient.patch.bind(apiClient),
 
   /** Upload a file via multipart/form-data. */
-  async postForm<T>(url: string, data: FormData) {
-    const response = await apiClient.post<T>(url, data, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response;
-  },
+
 };
 
 /**
- * WebSocket helper.  Uses the VITE_WS_URL env var when available,
- * otherwise falls back to a sensible default.
+ * WebSocket helper.  Uses the VITE_WS_URL env var when set,
+ * otherwise derives the URL from the current page's host so it works
+ * on any deployment — and uses wss:// automatically on HTTPS pages
+ * to avoid mixed-content blocks.
  */
 export const wsService = {
-  connect(onMessage: (data: unknown) => void, onError?: (error: unknown) => void) {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/notifications';
+  connect(token: string, onMessage: (data: unknown) => void, onError?: (error: unknown) => void) {
+    const baseUrl =
+      import.meta.env.VITE_WS_URL ||
+      (() => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${window.location.host}/ws/notifications`;
+      })();
+
+    // Append JWT as query param — required by the authenticated WS endpoint
+    const wsUrl = `${baseUrl}?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event: MessageEvent) => {
