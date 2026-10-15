@@ -37,9 +37,18 @@ services:
       DB_USER: "postgres"
       DB_PASSWORD: "postgrespassword"
       DB_NAME: "it_asset_db"
-      SECRET_KEY: "production_secret_key_change_me_in_real_prod"
+      SECRET_KEY: "661d43321fd322efb3978d4306eea25549609d6ce05199634c32163af4c9de8e"
       ALGORITHM: "HS256"
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
+
+  frontend:
+    build: ./frontend
+    container_name: it_asset_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
 
 volumes:
   postgres_data:

@@ -9,3 +9,5 @@ htmlcov
 .github
 *.log
 .env
+frontend
+node_modules

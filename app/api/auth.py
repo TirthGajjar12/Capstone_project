@@ -1,7 +1,8 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from app.database.connection import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, Token
@@ -92,11 +93,26 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
 
 @router.get("/users", response_model=List[UserResponse])
 def list_users(
+    search: Optional[str] = None,
+    role: Optional[str] = None,
+    limit: int = 100,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     List active users for ticket assignments and asset allocation.
+    Supports on-demand search by name or email with pagination/limit and optional role filtering.
     """
-    return db.query(User).filter(User.is_active == True).all()
+    query = db.query(User).filter(User.is_active == True)
+    if role and role.strip():
+        query = query.filter(User.role == role.strip().upper())
+    if search and search.strip():
+        search_term = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                User.full_name.ilike(search_term),
+                User.email.ilike(search_term)
+            )
+        )
+    return query.limit(limit).all()
 

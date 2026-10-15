@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from app.database.connection import get_db
 from app.models.ticket import Ticket, TicketHistory, TicketStatus, TicketPriority, TicketCategory
+from app.models.asset import Asset, AssetStatus, AssetAssignment
 from app.models.user import User
 from app.schemas.ticket import (
     TicketCreate, TicketResponse, TicketAssign, 
@@ -92,6 +93,7 @@ def list_tickets(
     status: Optional[TicketStatus] = None,
     priority: Optional[TicketPriority] = None,
     category: Optional[TicketCategory] = None,
+    search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -104,13 +106,20 @@ def list_tickets(
 
     if current_user.role == "EMPLOYEE":
         query = query.filter(Ticket.created_by_id == current_user.id)
-    else:
-        if status:
-            query = query.filter(Ticket.status == status)
-        if priority:
-            query = query.filter(Ticket.priority == priority)
-        if category:
-            query = query.filter(Ticket.category == category)
+
+    if status:
+        query = query.filter(Ticket.status == status)
+    if priority:
+        query = query.filter(Ticket.priority == priority)
+    if category:
+        query = query.filter(Ticket.category == category)
+    if search:
+        search_pattern = f"%{search.strip()}%"
+        query = query.filter(
+            (Ticket.title.ilike(search_pattern)) |
+            (Ticket.description.ilike(search_pattern)) |
+            (Ticket.ticket_number.ilike(search_pattern))
+        )
 
     return query.order_by(Ticket.created_at.desc()).all()
 
@@ -148,6 +157,19 @@ def assign_ticket(
     if not support_user or support_user.role not in ["SUPPORT", "ADMIN"]:
         raise HTTPException(status_code=400, detail="Target user must have SUPPORT or ADMIN role.")
 
+    # Non-admin support staff can only take an unassigned ticket or assign to themselves
+    if current_user.role != "ADMIN":
+        if ticket.assigned_to_id is not None and ticket.assigned_to_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Ticket is already assigned to another engineer. Only an administrator can reassign it."
+            )
+        if assign_in.assigned_to_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Support staff can only assign tickets to themselves."
+            )
+
     prev_status = ticket.status.value
     ticket.assigned_to_id = support_user.id
     ticket.status = TicketStatus.ASSIGNED
@@ -177,6 +199,13 @@ async def update_ticket_status(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found.")
 
+    # Only the assigned support engineer or Admin can update status
+    if current_user.role != "ADMIN" and ticket.assigned_to_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the assigned support engineer or an administrator can update the status of this ticket."
+        )
+
     prev_status = ticket.status.value
     ticket.status = status_in.status
 
@@ -201,7 +230,7 @@ async def update_ticket_status(
 
 
 @router.post("/{ticket_id}/resolve", response_model=TicketResponse)
-def resolve_ticket(
+async def resolve_ticket(
     ticket_id: int,
     resolve_in: TicketResolve,
     db: Session = Depends(get_db),
@@ -212,10 +241,27 @@ def resolve_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found.")
 
+    # Only the assigned support engineer or Admin can resolve
+    if current_user.role != "ADMIN" and ticket.assigned_to_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the assigned support engineer or an administrator can resolve this ticket."
+        )
+
     prev_status = ticket.status.value
     ticket.status = TicketStatus.RESOLVED
     ticket.resolution_notes = resolve_in.resolution_notes
     ticket.resolved_at = datetime.now(timezone.utc)
+
+    # If an asset is assigned as part of resolving this ticket:
+    if resolve_in.asset_id:
+        ticket.asset_id = resolve_in.asset_id
+        asset = db.query(Asset).filter(Asset.id == resolve_in.asset_id).first()
+        if asset:
+            asset.status = AssetStatus.ASSIGNED
+            asset.assigned_to_id = ticket.created_by_id
+            assignment_record = AssetAssignment(asset_id=asset.id, user_id=ticket.created_by_id)
+            db.add(assignment_record)
 
     history = TicketHistory(
         ticket_id=ticket.id,
@@ -227,11 +273,19 @@ def resolve_ticket(
     db.add(history)
     db.commit()
     db.refresh(ticket)
+
+    await ws_manager.broadcast("TICKET_STATUS_UPDATED", {
+        "ticket_id": ticket.id,
+        "ticket_number": ticket.ticket_number,
+        "new_status": ticket.status.value,
+        "resolution_notes": ticket.resolution_notes,
+    })
+
     return ticket
 
 
 @router.post("/{ticket_id}/close", response_model=TicketResponse)
-def close_ticket(
+async def close_ticket(
     ticket_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -259,4 +313,11 @@ def close_ticket(
     db.add(history)
     db.commit()
     db.refresh(ticket)
+
+    await ws_manager.broadcast("TICKET_STATUS_UPDATED", {
+        "ticket_id": ticket.id,
+        "ticket_number": ticket.ticket_number,
+        "new_status": ticket.status.value,
+    })
+
     return ticket

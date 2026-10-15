@@ -28,6 +28,7 @@ class TicketUpdateStatus(BaseModel):
 # 5. Schema for Resolving a Ticket
 class TicketResolve(BaseModel):
     resolution_notes: str
+    asset_id: Optional[int] = None
 
 # 6. Ticket History Response
 class TicketHistoryResponse(BaseModel):

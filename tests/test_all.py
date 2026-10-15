@@ -149,6 +149,89 @@ def test_resolve_ticket(client, admin_token):
     assert res.status_code == 200
     assert res.json()["status"] == "RESOLVED"
 
+def test_support_ticket_ownership_isolation(client, db_session, admin_token):
+    # Register Support User 1 and Support User 2
+    client.post("/auth/register", json={
+        "email": "support.one@company.com", "full_name": "Support One", "password": "Password123!"
+    })
+    client.post("/auth/register", json={
+        "email": "support.two@company.com", "full_name": "Support Two", "password": "Password123!"
+    })
+    
+    t1 = client.post("/auth/login", data={"username": "support.one@company.com", "password": "Password123!"}).json()["access_token"]
+    t2 = client.post("/auth/login", data={"username": "support.two@company.com", "password": "Password123!"}).json()["access_token"]
+
+    u1_id = client.get("/auth/me", headers={"Authorization": f"Bearer {t1}"}).json()["id"]
+    u2_id = client.get("/auth/me", headers={"Authorization": f"Bearer {t2}"}).json()["id"]
+
+    # Create a new ticket as employee
+    client.post("/auth/register", json={
+        "email": "emp.test@company.com", "full_name": "Emp Test", "password": "Password123!"
+    })
+    emp_tok = client.post("/auth/login", data={"username": "emp.test@company.com", "password": "Password123!"}).json()["access_token"]
+
+    t_res = client.post("/tickets", json={"title": "Test Ownership Issue", "description": "Keyboard broken"}, headers={"Authorization": f"Bearer {emp_tok}"})
+    ticket_id = t_res.json()["id"]
+
+    # User 1 assigns ticket to themselves
+    assign_res = client.post(f"/tickets/{ticket_id}/assign", json={"assigned_to_id": u1_id}, headers={"Authorization": f"Bearer {t1}"})
+    assert assign_res.status_code == 200
+
+    # User 2 tries to update status of User 1's ticket -> 403 Forbidden
+    res_forbidden_status = client.patch(f"/tickets/{ticket_id}/status", json={"status": "IN_PROGRESS"}, headers={"Authorization": f"Bearer {t2}"})
+    assert res_forbidden_status.status_code == 403
+
+    # User 2 tries to resolve User 1's ticket -> 403 Forbidden
+    res_forbidden_resolve = client.post(f"/tickets/{ticket_id}/resolve", json={"resolution_notes": "Fix by user 2"}, headers={"Authorization": f"Bearer {t2}"})
+    assert res_forbidden_resolve.status_code == 403
+
+    # User 1 starts work -> 200 OK
+    res_allowed_status = client.patch(f"/tickets/{ticket_id}/status", json={"status": "IN_PROGRESS"}, headers={"Authorization": f"Bearer {t1}"})
+    assert res_allowed_status.status_code == 200
+
+    # User 1 resolves -> 200 OK
+    res_allowed_resolve = client.post(f"/tickets/{ticket_id}/resolve", json={"resolution_notes": "Replaced switch"}, headers={"Authorization": f"Bearer {t1}"})
+    assert res_allowed_resolve.status_code == 200
+
+def test_resolve_ticket_with_asset_assignment(client, admin_token):
+    # 1. Create an available asset
+    asset_res = client.post("/assets", json={
+        "asset_type": "Mouse",
+        "brand": "Logitech",
+        "model": "MX Master 3S",
+        "serial_number": "SN-TEST-MOU-999"
+    }, headers={"Authorization": f"Bearer {admin_token}"})
+    assert asset_res.status_code == 201
+    asset_id = asset_res.json()["id"]
+
+    # 2. Register employee and create a hardware request ticket
+    client.post("/auth/register", json={
+        "email": "dev.mouse@company.com", "full_name": "Dev Mouse", "password": "Password123!"
+    })
+    emp_token = client.post("/auth/login", data={"username": "dev.mouse@company.com", "password": "Password123!"}).json()["access_token"]
+    ticket_res = client.post("/tickets", json={
+        "title": "Hardware Request: Mouse",
+        "description": "Need an ergonomic mouse"
+    }, headers={"Authorization": f"Bearer {emp_token}"})
+    assert ticket_res.status_code == 201
+    ticket_id = ticket_res.json()["id"]
+    emp_id = ticket_res.json()["created_by_id"]
+
+    # 3. Resolve ticket and assign asset in one step
+    resolve_res = client.post(f"/tickets/{ticket_id}/resolve", json={
+        "resolution_notes": "Assigned Logitech MX Master 3S",
+        "asset_id": asset_id
+    }, headers={"Authorization": f"Bearer {admin_token}"})
+    assert resolve_res.status_code == 200
+    ticket_data = resolve_res.json()
+    assert ticket_data["status"] == "RESOLVED"
+    assert ticket_data["asset_id"] == asset_id
+
+    # 4. Verify asset is now assigned to the employee
+    asset_check = client.get(f"/assets/{asset_id}", headers={"Authorization": f"Bearer {admin_token}"}).json()
+    assert asset_check["status"] == "ASSIGNED"
+    assert asset_check["assigned_to_id"] == emp_id
+
 # ==================== 5. REPORTS & HEALTH TESTS ====================
 
 def test_health_check(client):

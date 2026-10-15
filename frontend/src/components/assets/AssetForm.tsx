@@ -1,15 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { assetService } from '../../services/ticketService';
 import { useAuth } from '../../context/AuthContext';
 
-/**
- * AssetForm — create a new IT asset (Admin only).
- *
- * POST /assets { asset_tag, asset_type, brand, model, serial_number, purchase_date }
- * Returns: the newly created Asset with an auto-generated asset_tag if left empty.
- */
-const AssetForm: React.FC = () => {
+export const AssetForm: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -50,119 +44,145 @@ const AssetForm: React.FC = () => {
     }
   };
 
-
   return (
-    <>
-      <div className="page-header">
-        <div>
-          <h1>Add Asset</h1>
-          <p>Register a new IT asset in the system</p>
-        </div>
+    <div className="modern-form-wrapper">
+      <div className="modern-form-header">
+        <Link to="/assets" className="form-back-link">
+          ← Back to Asset Inventory
+        </Link>
+        <h1 className="modern-form-title">Provision New Hardware</h1>
+        <p className="modern-form-subtitle">
+          Register a new IT device into the central hardware catalog and inventory pool.
+        </p>
       </div>
 
-      <div className="page-body form-page">
-        <div className="form-card">
-          {error && <div className="alert alert-error">⚠️ {error}</div>}
+      <div className="modern-form-card">
+        {error && <div className="alert alert-error" style={{ marginBottom: '1.25rem' }}>⚠️ {error}</div>}
 
-          <form onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="asset-type">Asset Type *</label>
-                <select
-                  id="asset-type"
-                  value={assetType}
-                  onChange={(e) => setAssetType(e.target.value)}
-                >
-                  <option value="Laptop">Laptop</option>
-                  <option value="Monitor">Monitor</option>
-                  <option value="Keyboard">Keyboard</option>
-                  <option value="Mouse">Mouse</option>
-                  <option value="Printer">Printer</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="asset-tag">Asset Tag (Optional)</label>
-                <input
-                  id="asset-tag"
-                  type="text"
-                  placeholder="e.g. LAP-1099 (Leave empty to auto-generate)"
-                  value={assetTag}
-                  onChange={(e) => setAssetTag(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="asset-brand">Brand *</label>
-                <input
-                  id="asset-brand"
-                  type="text"
-                  placeholder="e.g. Dell, HP, Lenovo"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="asset-model">Model *</label>
-                <input
-                  id="asset-model"
-                  type="text"
-                  placeholder="e.g. Latitude 5520"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="asset-serial">Serial Number *</label>
-                <input
-                  id="asset-serial"
-                  type="text"
-                  placeholder="e.g. SN-XYZ12345"
-                  value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="asset-purchase-date">Purchase Date</label>
-                <input
-                  id="asset-purchase-date"
-                  type="date"
-                  value={purchaseDate}
-                  onChange={(e) => setPurchaseDate(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-actions">
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={submitting}
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid-2">
+            {/* Asset Type */}
+            <div className="form-group">
+              <label htmlFor="asset-type" className="form-label">
+                Equipment Type *
+              </label>
+              <select
+                id="asset-type"
+                className="form-control"
+                value={assetType}
+                onChange={(e) => setAssetType(e.target.value)}
               >
-                {submitting ? 'Creating…' : 'Add Asset'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => navigate('/assets')}
-              >
-                Cancel
-              </button>
+                <option value="Laptop">Laptop</option>
+                <option value="Monitor">Monitor</option>
+                <option value="Keyboard">Keyboard</option>
+                <option value="Mouse">Mouse</option>
+                <option value="Printer">Printer</option>
+              </select>
             </div>
-          </form>
-        </div>
+
+            {/* Custom Asset Tag */}
+            <div className="form-group">
+              <label htmlFor="asset-tag" className="form-label">
+                Asset Tag (Optional)
+              </label>
+              <input
+                id="asset-tag"
+                className="form-control"
+                type="text"
+                placeholder="e.g. LAP-1099 (Leave empty to auto-generate)"
+                value={assetTag}
+                onChange={(e) => setAssetTag(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            {/* Brand */}
+            <div className="form-group">
+              <label htmlFor="asset-brand" className="form-label">
+                Brand / Manufacturer *
+              </label>
+              <input
+                id="asset-brand"
+                className="form-control"
+                type="text"
+                placeholder="e.g. Apple, Dell, Lenovo, HP, Logitech"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Model */}
+            <div className="form-group">
+              <label htmlFor="asset-model" className="form-label">
+                Model Name / Spec *
+              </label>
+              <input
+                id="asset-model"
+                className="form-control"
+                type="text"
+                placeholder="e.g. Latitude 5540, MacBook Pro 16, MX Master 3S"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            {/* Serial Number */}
+            <div className="form-group">
+              <label htmlFor="asset-serial" className="form-label">
+                Hardware Serial Number *
+              </label>
+              <input
+                id="asset-serial"
+                className="form-control"
+                type="text"
+                placeholder="e.g. SN-88492019-B"
+                value={serialNumber}
+                onChange={(e) => setSerialNumber(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Purchase Date */}
+            <div className="form-group">
+              <label htmlFor="asset-purchase-date" className="form-label">
+                Procurement / Purchase Date
+              </label>
+              <input
+                id="asset-purchase-date"
+                className="form-control"
+                type="date"
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="form-card-footer">
+            <button
+              type="button"
+              className="btn-warm-secondary"
+              onClick={() => navigate('/assets')}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-warm-terracotta"
+              disabled={submitting}
+            >
+              {submitting ? 'Registering…' : 'Save to Inventory'}
+            </button>
+          </div>
+        </form>
       </div>
-    </>
+    </div>
   );
 };
 
