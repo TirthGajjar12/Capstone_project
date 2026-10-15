@@ -42,10 +42,10 @@ def export_assets_report(
 @router.get("/sla")
 def get_sla_report(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role(["ADMIN", "SUPPORT"]))
 ):
     """
     Get live SLA metrics (compliance rate, average resolution time, breaches).
-    Admins and Support see enterprise-wide metrics; Employees see metrics for their requests.
+    Restricted to IT Support and Administrator staff.
     """
-    return get_sla_metrics(db, user=current_user)
+    return get_sla_metrics(db)
