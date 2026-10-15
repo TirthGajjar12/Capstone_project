@@ -21,7 +21,6 @@ export const TicketList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
-  const [supportStaff, setSupportStaff] = useState<User[]>([]);
 
   // Fulfill Hardware Request Drawer State
   const [fulfillTicket, setFulfillTicket] = useState<Ticket | null>(null);
@@ -50,24 +49,9 @@ export const TicketList = () => {
     }
   };
 
-  const fetchStaff = async () => {
-    if (isAdmin || isSupport) {
-      try {
-        const allUsers = await userService.getAll();
-        setSupportStaff(allUsers.filter((u) => u.role === 'SUPPORT' || u.role === 'ADMIN'));
-      } catch {
-        setSupportStaff([]);
-      }
-    }
-  };
-
   useEffect(() => {
     fetchTickets();
   }, []);
-
-  useEffect(() => {
-    fetchStaff();
-  }, [user]);
 
   // Real-time synchronization via WebSocket
   useWebSocket(() => {
@@ -84,19 +68,6 @@ export const TicketList = () => {
     setActionLoadingId(ticketId);
     try {
       await ticketService.assign(ticketId, user.id);
-      await fetchTickets();
-    } catch (err: any) {
-      alert(err?.response?.data?.detail || 'Failed to assign ticket.');
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  const handleAdminAssign = async (ticketId: number, targetUserId: number) => {
-    if (!targetUserId) return;
-    setActionLoadingId(ticketId);
-    try {
-      await ticketService.assign(ticketId, targetUserId);
       await fetchTickets();
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Failed to assign ticket.');
@@ -522,36 +493,7 @@ export const TicketList = () => {
                       style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem' }}
                       title={assignedName || 'Unassigned'}
                     >
-                      {isAdmin && (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') && supportStaff.length > 0 ? (
-                        <select
-                          className="form-control"
-                          style={{
-                            fontSize: '0.74rem',
-                            padding: '0.15rem 0.35rem',
-                            height: '26px',
-                            minWidth: '110px',
-                            maxWidth: '135px',
-                            borderColor: ticket.assigned_to_id ? '#c7d2fe' : '#fed7aa',
-                            background: ticket.assigned_to_id ? '#f5f3ff' : '#fff7ed',
-                            color: ticket.assigned_to_id ? '#4338ca' : '#c2410c',
-                            fontWeight: 600,
-                          }}
-                          value={ticket.assigned_to_id || ''}
-                          disabled={actionLoadingId === ticket.id}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val) handleAdminAssign(ticket.id, Number(val));
-                          }}
-                          title="Admin: Dispatch / Reassign engineer"
-                        >
-                          <option value="">(Unassigned)</option>
-                          {supportStaff.map((staff) => (
-                            <option key={staff.id} value={staff.id}>
-                              {staff.full_name.split(' ')[0]} ({staff.role})
-                            </option>
-                          ))}
-                        </select>
-                      ) : assignedName ? (
+                      {assignedName ? (
                         <span style={{ color: isAssignedToMe ? '#6366f1' : 'inherit', fontWeight: isAssignedToMe ? 700 : 500 }}>
                           {assignedName} {isAssignedToMe && '(You)'}
                         </span>
@@ -565,18 +507,20 @@ export const TicketList = () => {
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       {(() => {
                         const isHardwareRequest =
-                          ticket.category === 'Hardware' &&
+                          (ticket.category || '').toLowerCase() === 'hardware' &&
                           (ticket.title.toLowerCase().startsWith('hardware request') ||
                             ticket.title.toLowerCase().includes('request:') ||
                             ticket.title.toLowerCase().includes('request equipment') ||
-                            ticket.description.toLowerCase().includes('requested equipment:'));
+                            (ticket.description || '').toLowerCase().includes('requested equipment:'));
 
-                        const canTake = (isSupport || isAdmin) && ticket.status === 'OPEN' && !ticket.assigned_to_id;
+                        // On general tickets panel, Admin does not assign or take tickets (dedicated Assign Tickets page is used)
+                        const canTake = isSupport && !isAdmin && ticket.status === 'OPEN' && !ticket.assigned_to_id;
                         const canStart = (isSupport || isAdmin) && ticket.status === 'ASSIGNED' && (isAssignedToMe || isAdmin);
-                        const canResolve = (isSupport || isAdmin) && (ticket.status === 'IN_PROGRESS' || ticket.status === 'ASSIGNED') && (isAssignedToMe || isAdmin);
+                        const canFulfill = (isSupport || isAdmin) && isHardwareRequest && ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED';
+                        const canResolve = (isSupport || isAdmin) && !isHardwareRequest && (ticket.status === 'IN_PROGRESS' || ticket.status === 'ASSIGNED') && (isAssignedToMe || isAdmin);
                         const canClose = isEmployee && ticket.status === 'RESOLVED';
 
-                        if (!canTake && !canStart && !canResolve && !canClose) {
+                        if (!canTake && !canStart && !canFulfill && !canResolve && !canClose) {
                           return <span style={{ fontSize: '0.75rem', color: '#a8a29e' }}>—</span>;
                         }
 
@@ -608,20 +552,20 @@ export const TicketList = () => {
                               </button>
                             )}
 
-                            {canResolve && isHardwareRequest && (
+                            {canFulfill && (
                               <button
                                 type="button"
                                 className="action-btn-sm action-btn-assign-asset"
                                 onClick={() => handleOpenFulfill(ticket)}
                                 disabled={actionLoadingId === ticket.id}
                                 style={{ padding: '0.2rem 0.5rem', fontSize: '0.74rem' }}
-                                title="Assign an available asset to fulfill this request"
+                                title="Assign an available hardware asset to fulfill this request"
                               >
-                                📦 Assign
+                                📦 Fulfill Hardware
                               </button>
                             )}
 
-                            {canResolve && !isHardwareRequest && (
+                            {canResolve && (
                               <button
                                 type="button"
                                 className="action-btn-sm action-btn-resolve"

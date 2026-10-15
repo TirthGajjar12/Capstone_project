@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ticketService } from '../../services/ticketService';
 import { Ticket } from '../../types';
 import AssignTicketDrawer from './AssignTicketDrawer';
+import FulfillRequestDrawer from './FulfillRequestDrawer';
 import useWebSocket from '../../hooks/useWebSocket';
 
 export const TicketAssignment: React.FC = () => {
@@ -22,9 +23,35 @@ export const TicketAssignment: React.FC = () => {
   const [tabFilter, setTabFilter] = useState<'UNASSIGNED' | 'ASSIGNED' | 'HIGH_PRIORITY' | 'ALL'>('UNASSIGNED');
   const [categoryFilter, setCategoryFilter] = useState('');
 
-  // Selected ticket for drawer
+  // Selected ticket for assign staff drawer
   const [selectedTicketForAssign, setSelectedTicketForAssign] = useState<Ticket | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Selected ticket for hardware fulfillment drawer
+  const [fulfillTicket, setFulfillTicket] = useState<Ticket | null>(null);
+  const [isFulfillDrawerOpen, setIsFulfillDrawerOpen] = useState(false);
+
+  const isHardwareRequest = (t: Ticket) => {
+    const title = (t.title || '').toLowerCase();
+    const desc = (t.description || '').toLowerCase();
+    return (
+      (t.category || '').toLowerCase() === 'hardware' &&
+      (title.startsWith('hardware request') ||
+        title.includes('request:') ||
+        title.includes('request equipment') ||
+        desc.includes('requested equipment:'))
+    );
+  };
+
+  const handleOpenAssign = (ticket: Ticket) => {
+    setSelectedTicketForAssign(ticket);
+    setIsDrawerOpen(true);
+  };
+
+  const handleOpenFulfill = (ticket: Ticket) => {
+    setFulfillTicket(ticket);
+    setIsFulfillDrawerOpen(true);
+  };
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,10 +77,7 @@ export const TicketAssignment: React.FC = () => {
     fetchTickets();
   }, []);
 
-  const handleOpenAssign = (ticket: Ticket) => {
-    setSelectedTicketForAssign(ticket);
-    setIsDrawerOpen(true);
-  };
+
 
   // Counts
   const totalCount = tickets.length;
@@ -462,6 +486,23 @@ export const TicketAssignment: React.FC = () => {
                         >
                           Completed
                         </span>
+                      ) : isHardwareRequest(ticket) ? (
+                        <button
+                          type="button"
+                          className="btn-assign-action"
+                          onClick={() => handleOpenFulfill(ticket)}
+                          title="Provision available hardware inventory to fulfill this request"
+                          style={{
+                            padding: '0.22rem 0.65rem',
+                            fontSize: '0.76rem',
+                            background: '#4f46e5',
+                            borderColor: '#4338ca',
+                            color: '#ffffff',
+                            fontWeight: 600,
+                          }}
+                        >
+                          📦 Fulfill Hardware
+                        </button>
                       ) : (
                         <button
                           type="button"
@@ -519,7 +560,7 @@ export const TicketAssignment: React.FC = () => {
         </div>
       </div>
 
-      {/* Slide-out Ticket Assignment Drawer */}
+      {/* Slide-out Ticket Assignment Drawer (for regular support tickets) */}
       <AssignTicketDrawer
         ticket={selectedTicketForAssign}
         isOpen={isDrawerOpen}
@@ -528,6 +569,18 @@ export const TicketAssignment: React.FC = () => {
           setSelectedTicketForAssign(null);
         }}
         onAssigned={fetchTickets}
+        onSwitchToHardware={handleOpenFulfill}
+      />
+
+      {/* Hardware Request Fulfillment Drawer (shows available hardware inventory) */}
+      <FulfillRequestDrawer
+        ticket={fulfillTicket}
+        isOpen={isFulfillDrawerOpen}
+        onClose={() => {
+          setIsFulfillDrawerOpen(false);
+          setFulfillTicket(null);
+        }}
+        onAssignedAndResolved={fetchTickets}
       />
     </div>
   );

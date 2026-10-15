@@ -24,10 +24,21 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Extract requested hardware type from title (e.g. "Hardware Request: Headset" -> "Headset")
-  const requestedType = ticket?.title.includes(':')
-    ? ticket.title.split(':')[1].trim()
-    : ticket?.title || '';
+  // Extract requested hardware type from title or description
+  const extractRequestedType = (): string => {
+    if (!ticket) return '';
+    if (ticket.title && ticket.title.includes(':')) {
+      return ticket.title.split(':')[1].trim();
+    }
+    const desc = ticket.description || '';
+    const match = desc.match(/Requested Equipment:\s*([^\n\r]+)/i);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    return ticket.title || '';
+  };
+
+  const requestedType = extractRequestedType();
 
   const requesterName =
     ticket?.created_by_name ||
@@ -45,6 +56,13 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
       setError(null);
       return;
     }
+
+    // Auto-select category filter based on requested hardware (e.g., Monitor -> MONITOR)
+    const reqUpper = extractRequestedType().toUpperCase();
+    const matchedCategory = ['LAPTOP', 'MONITOR', 'KEYBOARD', 'MOUSE', 'PRINTER'].find((c) =>
+      reqUpper.includes(c)
+    );
+    setCategoryFilter(matchedCategory || 'ALL');
 
     const loadAvailableAssets = async () => {
       setLoading(true);
@@ -253,11 +271,21 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
               Loading available inventory…
             </div>
           ) : filteredAssets.length === 0 ? (
-            <div className="drawer-empty-state" style={{ padding: '2rem 1rem' }}>
-              <span>📦</span>
-              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem' }}>
-                No available assets found {categoryFilter !== 'ALL' ? `for "${categoryFilter}"` : ''}.
+            <div className="drawer-empty-state" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
+              <span style={{ fontSize: '2rem' }}>📦</span>
+              <p style={{ margin: '0.5rem 0 0.5rem 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                No available assets found {categoryFilter !== 'ALL' ? `in category "${categoryFilter}"` : 'in inventory'}.
               </p>
+              {categoryFilter !== 'ALL' && (
+                <button
+                  type="button"
+                  className="btn-warm-secondary"
+                  onClick={() => setCategoryFilter('ALL')}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', marginTop: '0.25rem' }}
+                >
+                  Show All Available Inventory
+                </button>
+              )}
             </div>
           ) : (
             filteredAssets.map((asset) => {

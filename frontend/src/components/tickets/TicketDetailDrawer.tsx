@@ -37,11 +37,11 @@ export const TicketDetailDrawer: React.FC<TicketDetailDrawerProps> = ({
       : null);
 
   const isHardwareRequest =
-    ticket.category === 'Hardware' &&
+    (ticket.category || '').toLowerCase() === 'hardware' &&
     (ticket.title.toLowerCase().startsWith('hardware request') ||
       ticket.title.toLowerCase().includes('request:') ||
       ticket.title.toLowerCase().includes('request equipment') ||
-      ticket.description.toLowerCase().includes('requested equipment:'));
+      (ticket.description || '').toLowerCase().includes('requested equipment:'));
 
   const createdDate = ticket.created_at
     ? new Date(ticket.created_at).toLocaleString('en-US', {
@@ -352,8 +352,8 @@ export const TicketDetailDrawer: React.FC<TicketDetailDrawerProps> = ({
             </button>
           )}
 
-          {/* Support Actions in Drawer */}
-          {!isEmployee && (ticket.status === 'ASSIGNED' || ticket.status === 'IN_PROGRESS') && (
+          {/* Support / Admin Actions in Drawer */}
+          {!isEmployee && ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED' && (
             <div style={{ display: 'flex', gap: '0.4rem' }}>
               {isHardwareRequest && onOpenAssignAsset && (
                 <button
@@ -368,7 +368,7 @@ export const TicketDetailDrawer: React.FC<TicketDetailDrawerProps> = ({
                   📦 Assign Hardware
                 </button>
               )}
-              {onResolveTicket && (
+              {onResolveTicket && !isHardwareRequest && (ticket.status === 'IN_PROGRESS' || ticket.status === 'ASSIGNED') && (
                 <button
                   type="button"
                   className="btn btn-primary"

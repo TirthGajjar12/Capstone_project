@@ -7,6 +7,7 @@ interface AssignTicketDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onAssigned: () => void;
+  onSwitchToHardware?: (ticket: Ticket) => void;
 }
 
 export const AssignTicketDrawer: React.FC<AssignTicketDrawerProps> = ({
@@ -14,6 +15,7 @@ export const AssignTicketDrawer: React.FC<AssignTicketDrawerProps> = ({
   isOpen,
   onClose,
   onAssigned,
+  onSwitchToHardware,
 }) => {
   const [search, setSearch] = useState('');
   const [supportStaff, setSupportStaff] = useState<User[]>([]);
@@ -85,6 +87,14 @@ export const AssignTicketDrawer: React.FC<AssignTicketDrawerProps> = ({
 
   const pStyle = getPriorityColor(ticket.priority);
 
+  const isHardwareRequest =
+    Boolean(ticket &&
+    (ticket.category || '').toLowerCase() === 'hardware' &&
+    (ticket.title.toLowerCase().startsWith('hardware request') ||
+      ticket.title.toLowerCase().includes('request:') ||
+      ticket.title.toLowerCase().includes('request equipment') ||
+      (ticket.description || '').toLowerCase().includes('requested equipment:')));
+
   return (
     <div className="drawer-overlay" onClick={onClose}>
       <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
@@ -98,6 +108,49 @@ export const AssignTicketDrawer: React.FC<AssignTicketDrawerProps> = ({
             ✕
           </button>
         </div>
+
+        {/* Hardware Request Notice & Switch */}
+        {isHardwareRequest && (
+          <div
+            style={{
+              background: '#e0e7ff',
+              border: '1.5px solid #818cf8',
+              borderRadius: '8px',
+              padding: '0.85rem 1rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#3730a3', fontWeight: 700, fontSize: '0.86rem' }}>
+              <span>📦</span>
+              <span>Hardware Allocation Request</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#4338ca', lineHeight: 1.4 }}>
+              This is a hardware request for <strong>{ticket.title}</strong>. For hardware requests, available devices should be provisioned from inventory rather than assigning an engineer.
+            </p>
+            {onSwitchToHardware && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  onClose();
+                  onSwitchToHardware(ticket);
+                }}
+                style={{
+                  alignSelf: 'flex-start',
+                  fontSize: '0.78rem',
+                  padding: '0.35rem 0.75rem',
+                  background: '#4f46e5',
+                  borderColor: '#4338ca',
+                }}
+              >
+                📦 Open Hardware Inventory
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Selected Ticket Summary Card */}
         <div className="drawer-asset-card" style={{ marginBottom: '1.25rem' }}>
