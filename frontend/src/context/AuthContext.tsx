@@ -21,21 +21,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Restore session from localStorage on mount
+  // Validate and restore session from localStorage on mount
   useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    if (savedToken && savedUser) {
-      try {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+    const initAuth = async () => {
+      const savedToken = localStorage.getItem('token');
+      if (savedToken) {
         api.setToken(savedToken);
-      } catch {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        try {
+          const profileResponse = await api.get<User>('/auth/me');
+          setUser(profileResponse.data);
+          setToken(savedToken);
+          localStorage.setItem('user', JSON.stringify(profileResponse.data));
+        } catch {
+          // Token is expired or invalid: purge storage and reset
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          api.clearToken();
+          setUser(null);
+          setToken(null);
+        }
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   const login = async (email: string, password: string) => {

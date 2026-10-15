@@ -24,9 +24,20 @@ from app.api.network import router as network_router
 from app.api.ws import router as ws_router
 
 
-Base.metadata.create_all(bind=engine)
+from contextlib import asynccontextmanager
 
-app = FastAPI(title=settings.APP_NAME)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Only initialize production tables on actual application startup, not upon test module import
+    if settings.APP_ENV != "test":
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception:
+            # Non-blocking if database is offline during offline tool tasks
+            pass
+    yield
+
+app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
 # CORS middleware — explicit trusted frontend origins with credentials support
 app.add_middleware(

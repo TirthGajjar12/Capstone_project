@@ -11,6 +11,31 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
+// Central response interceptor: clears expired sessions and redirects to login
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const url = error.config?.url || '';
+      // Don't redirect if it's the login attempt itself failing with invalid credentials
+      if (!url.includes('/auth/login')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        delete apiClient.defaults.headers.common['Authorization'];
+        authToken = null;
+        if (
+          !window.location.pathname.startsWith('/login') &&
+          !window.location.pathname.startsWith('/signup') &&
+          !window.location.pathname.startsWith('/register')
+        ) {
+          window.location.href = '/login?expired=1';
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 let authToken: string | null = null;
 
 export const api = {

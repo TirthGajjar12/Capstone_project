@@ -8,7 +8,7 @@ export type AssetStatus = 'AVAILABLE' | 'ASSIGNED' | 'UNDER_REPAIR' | 'RETIRED' 
 
 export interface User {
   id: number;
-  employee_id: string;
+  employee_id?: string;
   full_name: string;
   email: string;
   role: Role;
@@ -54,6 +54,7 @@ export interface Ticket {
   created_at: string;
   sla_deadline: string | null;
   resolved_at?: string | null;
+  is_sla_breached?: boolean;
   sla_breached?: boolean;
   history?: TicketHistory[];
 }

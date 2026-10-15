@@ -64,32 +64,55 @@ def stream_assets_csv(db: Session) -> Generator[str, None, None]:
 
 def get_sla_metrics(db: Session) -> dict:
     """
-    Calculates SLA statistics across all tickets.
+    Calculates SLA statistics across all tickets, including active overdue requests.
     """
     total = db.query(Ticket).count()
     resolved = db.query(Ticket).filter(Ticket.status.in_([TicketStatus.RESOLVED, TicketStatus.CLOSED])).all()
-    
-    breached_count = 0
+    active_tickets = db.query(Ticket).filter(~Ticket.status.in_([TicketStatus.RESOLVED, TicketStatus.CLOSED])).all()
+
+    now = datetime.now(timezone.utc)
+    breached_resolved_count = 0
     total_resolution_seconds = 0
 
     for t in resolved:
-        if t.resolved_at and t.resolved_at > t.sla_deadline:
-            breached_count += 1
-        
-        if t.resolved_at:
-            delta = t.resolved_at - t.created_at
+        if t.sla_deadline and t.resolved_at:
+            deadline = t.sla_deadline if t.sla_deadline.tzinfo else t.sla_deadline.replace(tzinfo=timezone.utc)
+            resolved_at = t.resolved_at if t.resolved_at.tzinfo else t.resolved_at.replace(tzinfo=timezone.utc)
+            if resolved_at > deadline:
+                breached_resolved_count += 1
+
+        if t.resolved_at and t.created_at:
+            created_at = t.created_at if t.created_at.tzinfo else t.created_at.replace(tzinfo=timezone.utc)
+            resolved_at = t.resolved_at if t.resolved_at.tzinfo else t.resolved_at.replace(tzinfo=timezone.utc)
+            delta = resolved_at - created_at
             total_resolution_seconds += delta.total_seconds()
+
+    active_overdue_count = 0
+    for t in active_tickets:
+        if t.sla_deadline:
+            deadline = t.sla_deadline if t.sla_deadline.tzinfo else t.sla_deadline.replace(tzinfo=timezone.utc)
+            if now > deadline:
+                active_overdue_count += 1
+
+    total_breached = breached_resolved_count + active_overdue_count
 
     avg_resolution_hours = (
         round((total_resolution_seconds / len(resolved)) / 3600, 2)
         if resolved else 0.0
     )
 
+    compliance_rate = (
+        round(((len(resolved) - breached_resolved_count) / len(resolved)) * 100, 2)
+        if resolved else 100.0
+    )
+
     return {
         "total_tickets": total,
         "resolved_tickets": len(resolved),
-        "open_tickets": total - len(resolved),
-        "breached_tickets": breached_count,
-        "sla_compliance_rate_pct": round(((len(resolved) - breached_count) / len(resolved)) * 100, 2) if resolved else 100.0,
+        "open_tickets": len(active_tickets),
+        "breached_tickets": total_breached,
+        "resolved_breached_tickets": breached_resolved_count,
+        "active_overdue_tickets": active_overdue_count,
+        "sla_compliance_rate_pct": compliance_rate,
         "avg_resolution_time_hours": avg_resolution_hours
     }

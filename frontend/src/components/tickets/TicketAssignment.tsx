@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ticketService } from '../../services/ticketService';
 import { Ticket } from '../../types';
 import AssignTicketDrawer from './AssignTicketDrawer';
+import useWebSocket from '../../hooks/useWebSocket';
 
 export const TicketAssignment: React.FC = () => {
   const { user } = useAuth();
@@ -40,6 +41,10 @@ export const TicketAssignment: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useWebSocket(() => {
+    fetchTickets();
+  });
 
   useEffect(() => {
     fetchTickets();
@@ -445,15 +450,29 @@ export const TicketAssignment: React.FC = () => {
 
                     {/* Actions: Slide-out drawer trigger */}
                     <td className="cell-actions" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
-                        className="btn-assign-action"
-                        onClick={() => handleOpenAssign(ticket)}
-                        title="Assign or reassign support engineer"
-                        style={{ padding: '0.22rem 0.55rem', fontSize: '0.76rem' }}
-                      >
-                        {isAssigned ? '🔄 Reassign' : '👤 Assign'}
-                      </button>
+                      {ticket.status === 'RESOLVED' || ticket.status === 'CLOSED' ? (
+                        <span
+                          style={{
+                            fontSize: '0.74rem',
+                            color: 'var(--color-text-secondary, #6b7280)',
+                            fontStyle: 'italic',
+                            padding: '0.2rem 0.5rem',
+                          }}
+                          title="Completed tickets cannot be assigned or reassigned"
+                        >
+                          Completed
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-assign-action"
+                          onClick={() => handleOpenAssign(ticket)}
+                          title="Assign or reassign support engineer"
+                          style={{ padding: '0.22rem 0.55rem', fontSize: '0.76rem' }}
+                        >
+                          {isAssigned ? '🔄 Reassign' : '👤 Assign'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

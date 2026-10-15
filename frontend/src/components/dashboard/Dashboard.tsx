@@ -5,12 +5,15 @@ import { api } from '../../services/api';
 import { ticketService, assetService } from '../../services/ticketService';
 import { Ticket, Asset } from '../../types';
 import RequestAssetModal from '../assets/RequestAssetModal';
+import useWebSocket from '../../hooks/useWebSocket';
 
 interface SlaData {
   total_tickets: number;
   resolved_tickets: number;
   open_tickets: number;
   breached_tickets: number;
+  resolved_breached_tickets?: number;
+  active_overdue_tickets?: number;
   sla_compliance_rate_pct: number;
   avg_resolution_time_hours: number;
 }
@@ -60,6 +63,10 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [user, isStaff]);
+
+  useWebSocket(() => {
+    fetchData();
+  });
 
   // Real Counts
   const openCount = tickets.filter((t) => t.status === 'OPEN').length;
@@ -460,6 +467,21 @@ export const Dashboard: React.FC = () => {
                 {slaData && slaData.avg_resolution_time_hours > 0 && (
                   <div style={{ fontSize: '0.78rem', color: '#78716c', marginTop: '0.4rem' }}>
                     Average resolution time: <strong>{slaData.avg_resolution_time_hours} hours</strong>
+                  </div>
+                )}
+                {slaData && (slaData.active_overdue_tickets ?? 0) > 0 && (
+                  <div
+                    style={{
+                      fontSize: '0.78rem',
+                      color: '#dc2626',
+                      fontWeight: 600,
+                      marginTop: '0.4rem',
+                      background: 'rgba(239, 68, 68, 0.08)',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    ⚠️ {slaData.active_overdue_tickets} active ticket(s) currently past SLA deadline
                   </div>
                 )}
               </div>

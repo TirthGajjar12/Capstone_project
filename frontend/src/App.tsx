@@ -105,7 +105,14 @@ function App() {
                 }
               />
               <Route path="/tickets/assignment" element={<Navigate to="/tickets/assign" replace />} />
-              <Route path="/tickets/create" element={<TicketForm />} />
+              <Route
+                path="/tickets/create"
+                element={
+                  <RoleRoute allowedRoles={['EMPLOYEE']}>
+                    <TicketForm />
+                  </RoleRoute>
+                }
+              />
               <Route path="/assets" element={<AssetList />} />
               <Route path="/inventory/available" element={<AssetList availableOnly={true} />} />
               <Route
@@ -116,7 +123,7 @@ function App() {
                   </RoleRoute>
                 }
               />
-              <Route path="/home" element={<PageLoader><HomePage /></PageLoader>} />
+              <Route path="/home" element={<Navigate to="/dashboard" replace />} />
             </Route>
 
             {/* Catch-all route */}

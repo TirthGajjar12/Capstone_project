@@ -33,18 +33,20 @@ async def websocket_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # Optional: verify the user still exists and is active in DB
+    # Verify the user still exists and is active in DB
     db: Session = next(get_db())
     try:
         user = db.query(User).filter(User.id == int(user_id)).first()
         if not user or not user.is_active:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
+        user_id_val = user.id
+        user_role_val = user.role
     finally:
         db.close()
 
-    # --- Accept and register the authenticated connection ---
-    await ws_manager.connect(websocket)
+    # --- Accept and register the authenticated connection with user_id and role ---
+    await ws_manager.connect(websocket, user_id=user_id_val, role=user_role_val)
     try:
         # Keep connection alive; handle optional ping/pong from client
         while True:

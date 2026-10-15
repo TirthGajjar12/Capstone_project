@@ -22,10 +22,10 @@ router = APIRouter(prefix="/tickets", tags=["Tickets"])
 async def create_ticket(
     ticket_in: TicketCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role(["EMPLOYEE"]))
 ):
     """
-    Create a new support ticket:
+    Create a new support ticket (Employees only):
     - Auto-classifies category & priority using regex/rules if not explicitly provided
     - Calculates SLA deadline based on priority (e.g. CRITICAL=2h, HIGH=4h)
     - Generates ticket number (e.g. INC-1001)
@@ -52,7 +52,7 @@ async def create_ticket(
         referenced_asset = db.query(Asset).filter(Asset.id == ticket_in.asset_id).first()
         if not referenced_asset:
             raise HTTPException(status_code=404, detail="Referenced hardware asset not found.")
-        if current_user.role == "EMPLOYEE" and referenced_asset.assigned_to_id != current_user.id:
+        if referenced_asset.assigned_to_id != current_user.id:
             raise HTTPException(
                 status_code=403,
                 detail="Not authorized: You can only reference hardware assets currently assigned to you."
@@ -76,10 +76,7 @@ async def create_ticket(
     db.flush()  # Get DB-generated ID without committing
     new_ticket.ticket_number = f"INC-{1000 + new_ticket.id}"
 
-    db.commit()
-    db.refresh(new_ticket)
-
-    # Log creation in audit history
+    # Log creation in audit history in the SAME database transaction
     history = TicketHistory(
         ticket_id=new_ticket.id,
         changed_by_id=current_user.id,
@@ -91,13 +88,19 @@ async def create_ticket(
     db.commit()
     db.refresh(new_ticket)
 
-    await ws_manager.broadcast("TICKET_CREATED", {
-    "ticket_id": new_ticket.id,
-        "ticket_number": new_ticket.ticket_number,
-        "title": new_ticket.title,
-        "priority": new_ticket.priority.value,
-        "status": new_ticket.status.value
-    })
+    await ws_manager.broadcast_ticket_event(
+        "TICKET_CREATED",
+        {
+            "ticket_id": new_ticket.id,
+            "id": new_ticket.id,
+            "ticket_number": new_ticket.ticket_number,
+            "title": new_ticket.title,
+            "category": new_ticket.category.value,
+            "priority": new_ticket.priority.value,
+            "status": new_ticket.status.value
+        },
+        creator_id=new_ticket.created_by_id
+    )
 
     return new_ticket
 
@@ -157,7 +160,7 @@ def get_ticket(
 
 
 @router.post("/{ticket_id}/assign", response_model=TicketResponse)
-def assign_ticket(
+async def assign_ticket(
     ticket_id: int,
     assign_in: TicketAssign,
     db: Session = Depends(get_db),
@@ -206,6 +209,21 @@ def assign_ticket(
     db.add(history)
     db.commit()
     db.refresh(ticket)
+
+    await ws_manager.broadcast_ticket_event(
+        "TICKET_ASSIGNED",
+        {
+            "id": ticket.id,
+            "ticket_id": ticket.id,
+            "ticket_number": ticket.ticket_number,
+            "status": ticket.status.value,
+            "assigned_to_id": ticket.assigned_to_id,
+            "assigned_to_name": support_user.full_name
+        },
+        creator_id=ticket.created_by_id,
+        assigned_to_id=ticket.assigned_to_id
+    )
+
     return ticket
 
 
@@ -258,11 +276,19 @@ async def update_ticket_status(
     db.add(history)
     db.commit()
     db.refresh(ticket)
-    await ws_manager.broadcast("TICKET_STATUS_UPDATED", {
-        "ticket_id": ticket.id,
-        "ticket_number": ticket.ticket_number,
-        "new_status": ticket.status.value
-    })
+
+    await ws_manager.broadcast_ticket_event(
+        "TICKET_STATUS_UPDATED",
+        {
+            "id": ticket.id,
+            "ticket_id": ticket.id,
+            "ticket_number": ticket.ticket_number,
+            "status": ticket.status.value,
+            "new_status": ticket.status.value
+        },
+        creator_id=ticket.created_by_id,
+        assigned_to_id=ticket.assigned_to_id
+    )
 
     return ticket
 
@@ -335,12 +361,31 @@ async def resolve_ticket(
     db.commit()
     db.refresh(ticket)
 
-    await ws_manager.broadcast("TICKET_STATUS_UPDATED", {
-        "ticket_id": ticket.id,
-        "ticket_number": ticket.ticket_number,
-        "new_status": ticket.status.value,
-        "resolution_notes": ticket.resolution_notes,
-    })
+    await ws_manager.broadcast_ticket_event(
+        "TICKET_STATUS_UPDATED",
+        {
+            "id": ticket.id,
+            "ticket_id": ticket.id,
+            "ticket_number": ticket.ticket_number,
+            "status": ticket.status.value,
+            "new_status": ticket.status.value,
+            "resolution_notes": ticket.resolution_notes,
+        },
+        creator_id=ticket.created_by_id,
+        assigned_to_id=ticket.assigned_to_id
+    )
+
+    if asset:
+        await ws_manager.broadcast_asset_event(
+            "ASSET_ASSIGNED",
+            {
+                "id": asset.id,
+                "asset_tag": asset.asset_tag,
+                "status": asset.status.value,
+                "assigned_to_id": asset.assigned_to_id,
+            },
+            target_user_id=asset.assigned_to_id
+        )
 
     return ticket
 
@@ -388,10 +433,17 @@ async def close_ticket(
     db.commit()
     db.refresh(ticket)
 
-    await ws_manager.broadcast("TICKET_STATUS_UPDATED", {
-        "ticket_id": ticket.id,
-        "ticket_number": ticket.ticket_number,
-        "new_status": ticket.status.value,
-    })
+    await ws_manager.broadcast_ticket_event(
+        "TICKET_STATUS_UPDATED",
+        {
+            "id": ticket.id,
+            "ticket_id": ticket.id,
+            "ticket_number": ticket.ticket_number,
+            "status": ticket.status.value,
+            "new_status": ticket.status.value,
+        },
+        creator_id=ticket.created_by_id,
+        assigned_to_id=ticket.assigned_to_id
+    )
 
     return ticket

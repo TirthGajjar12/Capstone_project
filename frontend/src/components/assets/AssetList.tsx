@@ -5,6 +5,7 @@ import { Asset } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import AssignAssetDrawer from './AssignAssetDrawer';
 import RequestAssetModal from './RequestAssetModal';
+import useWebSocket from '../../hooks/useWebSocket';
 
 interface AssetListProps {
   availableOnly?: boolean;
@@ -53,6 +54,10 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
   useEffect(() => {
     fetchAssets();
   }, [statusFilter, isAvailablePage]);
+
+  useWebSocket(() => {
+    fetchAssets();
+  });
 
   // Open Assign Drawer for specific asset
   const handleOpenAssign = (asset: Asset) => {

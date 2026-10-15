@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 function LoginPage() {
+  const [searchParams] = useSearchParams();
+  const isExpired = searchParams.get('expired') === '1';
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -64,6 +67,13 @@ function LoginPage() {
           {/* Welcome Text */}
           <h1 className="warm-login-welcome">Welcome back</h1>
           <p className="warm-login-subtitle">Sign in to your account to continue</p>
+
+          {/* Expired Session Notice */}
+          {isExpired && !errorMessage && (
+            <div className="alert alert-warning" style={{ marginBottom: '1.25rem' }}>
+              ℹ️ Your session has expired. Please sign in again to continue.
+            </div>
+          )}
 
           {/* Error Alert */}
           {errorMessage && (

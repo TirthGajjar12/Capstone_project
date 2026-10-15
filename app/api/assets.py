@@ -6,12 +6,13 @@ from app.models.asset import Asset, AssetAssignment, AssetStatus, AssetType
 from app.models.user import User
 from app.schemas.asset import AssetCreate, AssetAssign, AssetResponse
 from app.api.deps import get_current_user, require_role
+from app.services.websocket_manager import ws_manager
 
 router = APIRouter(prefix="/assets", tags=["Assets"])
 
 @router.post("", response_model=AssetResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 @router.post("/", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)
-def create_asset(
+async def create_asset(
     asset_in: AssetCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["ADMIN"]))  # Admin only
@@ -56,6 +57,10 @@ def create_asset(
     db.add(new_asset)
     db.commit()
     db.refresh(new_asset)
+    await ws_manager.broadcast_asset_event(
+        "ASSET_CREATED",
+        {"id": new_asset.id, "asset_tag": new_asset.asset_tag, "status": new_asset.status.value}
+    )
     return new_asset
 
 
@@ -108,7 +113,7 @@ def get_asset(
 
 
 @router.post("/{asset_id}/assign", response_model=AssetResponse)
-def assign_asset(
+async def assign_asset(
     asset_id: int,
     assign_in: AssetAssign,
     db: Session = Depends(get_db),
@@ -145,11 +150,24 @@ def assign_asset(
 
     db.commit()
     db.refresh(asset)
+
+    await ws_manager.broadcast_asset_event(
+        "ASSET_ASSIGNED",
+        {
+            "id": asset.id,
+            "asset_tag": asset.asset_tag,
+            "status": asset.status.value,
+            "assigned_to_id": asset.assigned_to_id,
+            "assigned_to_name": target_user.full_name
+        },
+        target_user_id=asset.assigned_to_id
+    )
+
     return asset
 
 
 @router.post("/{asset_id}/return", response_model=AssetResponse)
-def return_asset(
+async def return_asset(
     asset_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["ADMIN", "SUPPORT"]))
@@ -178,4 +196,16 @@ def return_asset(
 
     db.commit()
     db.refresh(asset)
+
+    await ws_manager.broadcast_asset_event(
+        "ASSET_RETURNED",
+        {
+            "id": asset.id,
+            "asset_tag": asset.asset_tag,
+            "status": asset.status.value,
+            "assigned_to_id": None
+        },
+        target_user_id=active_assignment.user_id if active_assignment else None
+    )
+
     return asset

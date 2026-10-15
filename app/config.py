@@ -1,4 +1,5 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict #BaseSettings gives your class the ability to load and validate application settings.#SettingsConfigDict lets you specify configuration options for how that loading and validation should work
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     APP_NAME: str = "IT Asset & Support Ticket Management"
@@ -13,7 +14,7 @@ class Settings(BaseSettings):
     DB_NAME: str = "it_asset_db"
 
     # Security Settings
-    SECRET_KEY: str = "default_secret_key"
+    SECRET_KEY: str = "dev_insecure_secret_key_change_in_production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
@@ -23,8 +24,23 @@ class Settings(BaseSettings):
     # Modern Pydantic V2 configuration
     model_config = SettingsConfigDict(
         env_file=".env",
-        extra="ignore" # This tells Pydantic: "If you see variables in the .env file that aren't defined as fields in the Settings class, just ignore them and don't throw an error."
+        extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def validate_security(self):
+        """Enforces that production deployments do not rely on default or publicly committed keys."""
+        if self.APP_ENV.lower() in ("production", "prod"):
+            insecure_defaults = {
+                "default_secret_key",
+                "dev_insecure_secret_key_change_in_production",
+                "661d43321fd322efb3978d4306eea25549609d6ce05199634c32163af4c9de8e",
+            }
+            if not self.SECRET_KEY or self.SECRET_KEY in insecure_defaults or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "FATAL: In production (APP_ENV=production), SECRET_KEY must be a cryptographically secure random string (at least 32 characters) provided via environment variables."
+                )
+        return self
 
     @property
     def cors_origins_list(self) -> list[str]:
