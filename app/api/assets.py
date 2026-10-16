@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database.connection import get_db
@@ -67,15 +67,20 @@ async def create_asset(
 @router.get("", response_model=List[AssetResponse], include_in_schema=False)
 @router.get("/", response_model=List[AssetResponse])
 def list_assets(
+    response: Response,
     asset_type: Optional[AssetType] = None,
     asset_status: Optional[AssetStatus] = None,
+    search: Optional[str] = None,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: Optional[int] = Query(None, ge=1, le=1000, description="Max number of records to return"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    List assets:
+    List assets with optional filtering and pagination:
     - Employees: can ONLY view assets assigned to their account.
     - Admin & Support: can view all company assets in inventory.
+    - Supports skip and limit for server-side pagination.
     """
     query = db.query(Asset)
 
@@ -88,6 +93,26 @@ def list_assets(
             query = query.filter(Asset.asset_type == asset_type)
         if asset_status:
             query = query.filter(Asset.status == asset_status)
+
+    if search and search.strip():
+        search_pattern = f"%{search.strip()}%"
+        query = query.filter(
+            (Asset.asset_tag.ilike(search_pattern)) |
+            (Asset.brand.ilike(search_pattern)) |
+            (Asset.model.ilike(search_pattern)) |
+            (Asset.serial_number.ilike(search_pattern))
+        )
+
+    # Set total matching count in header for pagination awareness
+    total_count = query.count()
+    response.headers["X-Total-Count"] = str(total_count)
+
+    query = query.order_by(Asset.id.asc())
+
+    if skip:
+        query = query.offset(skip)
+    if limit is not None:
+        query = query.limit(limit)
 
     return query.all()
 

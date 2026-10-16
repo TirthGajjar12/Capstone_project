@@ -7,9 +7,18 @@ from app.database.connection import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, Token
 from app.utils.security import hash_password, verify_password, create_access_token
+from app.utils.rsa_crypto import get_public_key_pem, decrypt_password
 from app.api.deps import get_current_user, require_role
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+@router.get("/public-key")
+def get_public_key():
+    """
+    Returns the RSA public key in PEM format.
+    Used by the frontend to encrypt passwords in the browser before sending over the network.
+    """
+    return {"public_key": get_public_key_pem()}
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
@@ -28,8 +37,9 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
             detail="A user with this email already exists."
         )
 
-    # 2. Hash the raw password
-    hashed_pwd = hash_password(user_in.password)
+    # 2. Decrypt if client-side encrypted, then hash
+    raw_password = decrypt_password(user_in.password)
+    hashed_pwd = hash_password(raw_password)
 
     # 3. Create the database record (role is already derived by UserCreate schema validator)
     new_user = User(
@@ -51,12 +61,15 @@ def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
     """
     Authenticate a user:
     - form_data.username receives the user's email
-    - form_data.password receives the raw password
+    - form_data.password receives the raw or RSA-encrypted password
     - Issues a signed JWT access token containing user id, email, and role
     """
-    # 1. Find user by email (passed in form_data.username)
+    # 1. Decrypt if client-side encrypted
+    plain_password = decrypt_password(form_data.password)
+
+    # 2. Find user by email (passed in form_data.username)
     user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(plain_password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",

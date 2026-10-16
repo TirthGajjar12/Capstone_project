@@ -5,10 +5,12 @@ import { Ticket, Asset, User } from '../types';
  * Ticket API calls — matches the FastAPI `/tickets` router.
  */
 export const ticketService = {
-  async getAll(status?: string, search?: string): Promise<Ticket[]> {
+  async getAll(status?: string, search?: string, skip?: number, limit?: number): Promise<Ticket[]> {
     const params = new URLSearchParams();
     if (status) params.append('status', status);
     if (search) params.append('search', search);
+    if (skip !== undefined && skip !== null) params.append('skip', String(skip));
+    if (limit !== undefined && limit !== null) params.append('limit', String(limit));
     const query = params.toString() ? `?${params.toString()}` : '';
     const response = await api.get<Ticket[]>(`/tickets/${query}`);
     return response.data;
@@ -55,9 +57,13 @@ export const ticketService = {
  * Asset API calls — matches the FastAPI `/assets` router.
  */
 export const assetService = {
-  async getAll(status?: string): Promise<Asset[]> {
+  async getAll(status?: string, type?: string, search?: string, skip?: number, limit?: number): Promise<Asset[]> {
     const params = new URLSearchParams();
     if (status) params.append('asset_status', status);
+    if (type && type !== 'ALL') params.append('asset_type', type);
+    if (search) params.append('search', search);
+    if (skip !== undefined && skip !== null) params.append('skip', String(skip));
+    if (limit !== undefined && limit !== null) params.append('limit', String(limit));
     const query = params.toString() ? `?${params.toString()}` : '';
     const response = await api.get<Asset[]>(`/assets/${query}`);
     return response.data;

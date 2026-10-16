@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
+import { encryptPassword } from '../utils/crypto';
 
 interface AuthContextType {
   user: User | null;
@@ -51,10 +52,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       setLoading(true);
+      // Asymmetrically encrypt password with RSA-OAEP before network transmission
+      const securePassword = await encryptPassword(password);
+
       // FastAPI OAuth2PasswordRequestForm expects form-urlencoded (username & password)
       const formData = new URLSearchParams();
       formData.append('username', email);
-      formData.append('password', password);
+      formData.append('password', securePassword);
 
       const response = await api.post('/auth/login', formData, {
         headers: {
@@ -87,8 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       setLoading(true);
+      // Asymmetrically encrypt password with RSA-OAEP before network transmission
+      const securePassword = await encryptPassword(password);
+
       // Register new user via POST /auth/register
-      await api.post('/auth/register', { full_name: fullName, email, password, role });
+      await api.post('/auth/register', { full_name: fullName, email, password: securePassword, role });
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||

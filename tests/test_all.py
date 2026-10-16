@@ -247,3 +247,78 @@ def test_export_tickets_csv(client, admin_token):
     response = client.get("/reports/tickets/export", headers={"Authorization": f"Bearer {admin_token}"})
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/csv; charset=utf-8"
+
+# ==================== 6. PAGINATION (SKIP / LIMIT) TESTS ====================
+
+def test_tickets_pagination_skip_limit(client, admin_token):
+    # Fetch first page with limit=1
+    res1 = client.get("/tickets/?skip=0&limit=1", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res1.status_code == 200
+    assert "X-Total-Count" in res1.headers
+    data1 = res1.json()
+    assert len(data1) <= 1
+
+    # Fetch second page with skip=1, limit=1
+    res2 = client.get("/tickets/?skip=1&limit=1", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert len(data2) <= 1
+
+    # If multiple tickets exist, records on page 1 and page 2 must be different
+    if data1 and data2:
+        assert data1[0]["id"] != data2[0]["id"]
+
+def test_assets_pagination_skip_limit(client, admin_token):
+    res = client.get("/assets/?skip=0&limit=1", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res.status_code == 200
+    assert "X-Total-Count" in res.headers
+    data = res.json()
+    assert len(data) <= 1
+
+# ==================== 7. RSA ASYMMETRIC ENCRYPTION TESTS ====================
+
+def test_rsa_public_key_endpoint(client):
+    res = client.get("/auth/public-key")
+    assert res.status_code == 200
+    data = res.json()
+    assert "public_key" in data
+    assert "-----BEGIN PUBLIC KEY-----" in data["public_key"]
+    assert "-----END PUBLIC KEY-----" in data["public_key"]
+
+def test_rsa_encrypted_login_flow(client):
+    import base64
+    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives import serialization, hashes
+
+    # 1. Fetch public key from endpoint
+    res = client.get("/auth/public-key")
+    pub_pem = res.json()["public_key"].encode("utf-8")
+    public_key = serialization.load_pem_public_key(pub_pem)
+
+    # 2. Register test user with plain password
+    client.post("/auth/register", json={
+        "email": "rsa.user@company.com",
+        "full_name": "RSA Test User",
+        "password": "RsaPassword123!"
+    })
+
+    # 3. Encrypt password using RSA-OAEP + SHA-256 (simulating browser WebCrypto)
+    ciphertext = public_key.encrypt(
+        b"RsaPassword123!",
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    encrypted_b64 = f"RSA:{base64.b64encode(ciphertext).decode('utf-8')}"
+
+    # 4. Attempt login with encrypted password
+    login_res = client.post("/auth/login", data={
+        "username": "rsa.user@company.com",
+        "password": encrypted_b64
+    })
+    assert login_res.status_code == 200
+    assert "access_token" in login_res.json()
+
+

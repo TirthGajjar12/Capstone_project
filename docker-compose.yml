@@ -1,4 +1,4 @@
-version: '3.8'
+name: capstone-project
 
 services:
   db:
@@ -23,6 +23,7 @@ services:
 
   backend:
     build: .
+    image: it-asset-backend:latest
     container_name: it_asset_fastapi
     restart: always
     depends_on:
@@ -45,6 +46,7 @@ services:
 
   frontend:
     build: ./frontend
+    image: it-asset-frontend:latest
     container_name: it_asset_frontend
     restart: always
     depends_on:

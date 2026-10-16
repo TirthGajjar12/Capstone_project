@@ -1,5 +1,5 @@
 from app.services.websocket_manager import ws_manager
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -108,10 +108,13 @@ async def create_ticket(
 @router.get("", response_model=List[TicketResponse], include_in_schema=False)
 @router.get("/", response_model=List[TicketResponse])
 def list_tickets(
+    response: Response,
     status: Optional[TicketStatus] = None,
     priority: Optional[TicketPriority] = None,
     category: Optional[TicketCategory] = None,
     search: Optional[str] = None,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: Optional[int] = Query(None, ge=1, le=1000, description="Max number of records to return"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -119,6 +122,7 @@ def list_tickets(
     List tickets:
     - Employees: see only tickets they created
     - Support / Admin: see all tickets with optional filters
+    - Supports pagination via skip and limit query parameters
     """
     query = db.query(Ticket)
 
@@ -139,7 +143,18 @@ def list_tickets(
             (Ticket.ticket_number.ilike(search_pattern))
         )
 
-    return query.order_by(Ticket.created_at.desc()).all()
+    # Set total count header for pagination awareness
+    total_count = query.count()
+    response.headers["X-Total-Count"] = str(total_count)
+
+    query = query.order_by(Ticket.created_at.desc())
+
+    if skip:
+        query = query.offset(skip)
+    if limit is not None:
+        query = query.limit(limit)
+
+    return query.all()
 
 
 @router.get("/{ticket_id}", response_model=TicketResponse)
