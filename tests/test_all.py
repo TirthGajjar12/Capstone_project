@@ -321,4 +321,50 @@ def test_rsa_encrypted_login_flow(client):
     assert login_res.status_code == 200
     assert "access_token" in login_res.json()
 
+def test_filtered_totals_before_pagination(client, admin_token):
+    # Fetch all tickets
+    all_res = client.get("/tickets/", headers={"Authorization": f"Bearer {admin_token}"})
+    all_tickets = all_res.json()
+    resolved_count = sum(1 for t in all_tickets if t["status"] == "RESOLVED")
+
+    # Fetch with status filter and limit=1
+    filtered_res = client.get("/tickets/?status=RESOLVED&skip=0&limit=1", headers={"Authorization": f"Bearer {admin_token}"})
+    assert filtered_res.status_code == 200
+    assert "X-Total-Count" in filtered_res.headers
+    # X-Total-Count must reflect the filtered total, NOT the entire unfiltered database
+    assert int(filtered_res.headers["X-Total-Count"]) == resolved_count
+
+def test_pagination_pages_do_not_overlap(client, admin_token):
+    res_page1 = client.get("/tickets/?skip=0&limit=2", headers={"Authorization": f"Bearer {admin_token}"})
+    res_page2 = client.get("/tickets/?skip=2&limit=2", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_page1.status_code == 200
+    assert res_page2.status_code == 200
+    
+    ids_page1 = {t["id"] for t in res_page1.json()}
+    ids_page2 = {t["id"] for t in res_page2.json()}
+    # Page 1 and Page 2 must not have overlapping ticket IDs
+    assert ids_page1.isdisjoint(ids_page2)
+
+def test_rsa_malformed_payload_fails_closed(client):
+    # Attempt login with corrupted RSA payload
+    res = client.post("/auth/login", data={
+        "username": "rsa.user@company.com",
+        "password": "RSA:corrupted_malformed_base64_data_12345"
+    })
+    # Must fail closed with 400 Bad Request
+    assert res.status_code == 400
+    assert "Malformed or undecryptable RSA credential payload" in res.json()["detail"]
+
+def test_rsa_key_persistence(client):
+    import os
+    from app.utils.rsa_crypto import get_public_key_pem
+    # Public key should be consistent across repeated calls
+    k1 = get_public_key_pem()
+    k2 = get_public_key_pem()
+    assert k1 == k2
+    # Verify key is persisted on disk
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    assert os.path.exists(os.path.join(root_dir, "keys", "rsa_private.pem"))
+
+
 

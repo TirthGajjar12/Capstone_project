@@ -37,26 +37,65 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 10;
+
+  // Counts for staff hero cards
+  const [summaryCounts, setSummaryCounts] = useState({ total: 0, active: 0, stock: 0, repair: 0 });
+
+  const fetchSummaryCounts = async () => {
+    try {
+      const all = await assetService.getAll();
+      setSummaryCounts({
+        total: all.length,
+        active: all.filter((a) => a.status === 'ASSIGNED').length,
+        stock: all.filter((a) => a.status === 'AVAILABLE').length,
+        repair: all.filter((a) => a.status === 'UNDER_REPAIR').length,
+      });
+    } catch {
+      // ignore
+    }
+  };
 
   const fetchAssets = async () => {
     setLoading(true);
     try {
-      const data = await assetService.getAll(isAvailablePage ? 'AVAILABLE' : (statusFilter || undefined));
-      setAssets(data);
+      const skip = (currentPage - 1) * itemsPerPage;
+      const statusParam = isAvailablePage ? 'AVAILABLE' : (statusFilter || undefined);
+      let typeParam: string | undefined = undefined;
+      if (typeFilter === 'LAPTOPS') typeParam = 'LAPTOP';
+      else if (typeFilter === 'MONITORS') typeParam = 'MONITOR';
+      else if (typeFilter === 'PERIPHERALS') typeParam = 'KEYBOARD';
+
+      const res = await assetService.getPaginated(
+        statusParam,
+        typeParam,
+        search.trim() || undefined,
+        skip,
+        itemsPerPage
+      );
+      setAssets(res.items);
+      setTotalItems(res.total);
     } catch {
       setAssets([]);
+      setTotalItems(0);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, typeFilter, search, isAvailablePage]);
+
+  useEffect(() => {
     fetchAssets();
-  }, [statusFilter, isAvailablePage]);
+    fetchSummaryCounts();
+  }, [currentPage, statusFilter, typeFilter, search, isAvailablePage]);
 
   useWebSocket(() => {
     fetchAssets();
+    fetchSummaryCounts();
   });
 
   // Open Assign Drawer for specific asset
@@ -73,6 +112,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
     try {
       await assetService.returnAsset(String(assetId));
       await fetchAssets();
+      await fetchSummaryCounts();
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Failed to return asset.');
     } finally {
@@ -80,45 +120,19 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
     }
   };
 
-  // Filter assets by search and type tabs
-  const filtered = assets.filter((a) => {
-    const matchesSearch =
-      !search ||
-      (a.asset_tag || a.asset_id || '').toLowerCase().includes(search.toLowerCase()) ||
-      (a.brand && a.brand.toLowerCase().includes(search.toLowerCase())) ||
-      (a.model && a.model.toLowerCase().includes(search.toLowerCase())) ||
-      (a.serial_number && a.serial_number.toLowerCase().includes(search.toLowerCase())) ||
-      (a.assigned_to_name && a.assigned_to_name.toLowerCase().includes(search.toLowerCase()));
-
-    let matchesType = true;
-    if (typeFilter === 'LAPTOPS') {
-      matchesType = (a.asset_type || '').toUpperCase().includes('LAPTOP');
-    } else if (typeFilter === 'MONITORS') {
-      matchesType = (a.asset_type || '').toUpperCase().includes('MONITOR');
-    } else if (typeFilter === 'PERIPHERALS') {
-      const t = (a.asset_type || '').toUpperCase();
-      matchesType = t.includes('MOUSE') || t.includes('KEYBOARD') || t.includes('PRINTER') || t.includes('DOCK') || t.includes('HEADSET');
-    }
-
-    return matchesSearch && matchesType;
-  });
-
-  const totalItems = filtered.length;
+  const paginatedAssets = assets;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-  const paginatedAssets = filtered.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
 
   // Counts for staff
-  const totalCount = assets.length;
-  const activeCount = assets.filter((a) => a.status === 'ASSIGNED').length;
-  const stockCount = assets.filter((a) => a.status === 'AVAILABLE').length;
-  const repairCount = assets.filter((a) => a.status === 'UNDER_REPAIR').length;
+  const totalCount = summaryCounts.total;
+  const activeCount = summaryCounts.active;
+  const stockCount = summaryCounts.stock;
+  const repairCount = summaryCounts.repair;
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
+    const all = await assetService.getAll();
     const headers = ['Asset Tag', 'Type', 'Brand', 'Model', 'Serial Number', 'Status', 'Assigned To'];
-    const rows = filtered.map((a) => [
+    const rows = all.map((a) => [
       a.asset_tag || `AST-${a.id}`,
       a.asset_type,
       a.brand,
@@ -364,7 +378,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
             <div className="spinner" />
             Loading hardware catalog…
           </div>
-        ) : filtered.length === 0 ? (
+        ) : paginatedAssets.length === 0 ? (
           <div className="inventory-empty-state" style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
             <span className="empty-icon" style={{ fontSize: '2.5rem' }}>📦</span>
             <h3 style={{ margin: '0.75rem 0 0.35rem 0' }}>
@@ -511,7 +525,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
         {/* Bottom Pagination */}
         <div className="inventory-pagination">
           <div className="pagination-count">
-            Showing <strong>{filtered.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</strong> -{' '}
+            Showing <strong>{totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</strong> -{' '}
             <strong>{Math.min(currentPage * itemsPerPage, totalItems)}</strong> of <strong>{totalItems}</strong> devices
           </div>
           {totalPages > 1 && (

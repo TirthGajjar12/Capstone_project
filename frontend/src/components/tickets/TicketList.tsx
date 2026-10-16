@@ -34,28 +34,73 @@ export const TicketList = () => {
   const isSupport = user?.role === 'SUPPORT';
   const isAdmin = user?.role === 'ADMIN';
 
+  // Server-side Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 10;
+
+  // Accurate counts for status tabs
+  const [statusCounts, setStatusCounts] = useState({ total: 0, open: 0, inProgress: 0, resolved: 0, closed: 0 });
+
+  const fetchStatusCounts = async () => {
+    try {
+      const all = await ticketService.getAll();
+      setStatusCounts({
+        total: all.length,
+        open: all.filter((t) => t.status === 'OPEN').length,
+        inProgress: all.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'ASSIGNED').length,
+        resolved: all.filter((t) => t.status === 'RESOLVED').length,
+        closed: all.filter((t) => t.status === 'CLOSED').length,
+      });
+    } catch {
+      // ignore
+    }
+  };
+
   const fetchTickets = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await ticketService.getAll();
-      setTickets(data);
+      const skip = (currentPage - 1) * itemsPerPage;
+      let statusParam: string | undefined = undefined;
+      if (statusFilter === 'OPEN') statusParam = 'OPEN';
+      else if (statusFilter === 'IN_PROGRESS') statusParam = 'IN_PROGRESS';
+      else if (statusFilter === 'RESOLVED') statusParam = 'RESOLVED';
+      else if (statusFilter === 'CLOSED') statusParam = 'CLOSED';
+
+      const res = await ticketService.getPaginated(
+        statusParam,
+        priorityFilter || undefined,
+        categoryFilter || undefined,
+        search.trim() || undefined,
+        skip,
+        itemsPerPage
+      );
+      setTickets(res.items);
+      setTotalItems(res.total);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || err?.message || 'Failed to load tickets from server.';
       setError(msg);
       setTickets([]);
+      setTotalItems(0);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, priorityFilter, categoryFilter, search]);
+
+  useEffect(() => {
     fetchTickets();
-  }, []);
+    fetchStatusCounts();
+  }, [currentPage, statusFilter, priorityFilter, categoryFilter, search]);
 
   // Real-time synchronization via WebSocket
   useWebSocket(() => {
     fetchTickets();
+    fetchStatusCounts();
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -69,6 +114,7 @@ export const TicketList = () => {
     try {
       await ticketService.assign(ticketId, user.id);
       await fetchTickets();
+      await fetchStatusCounts();
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Failed to assign ticket.');
     } finally {
@@ -81,6 +127,7 @@ export const TicketList = () => {
     try {
       await ticketService.updateStatus(ticketId, 'IN_PROGRESS', 'Work started by IT support.');
       await fetchTickets();
+      await fetchStatusCounts();
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Failed to update ticket status.');
     } finally {
@@ -96,6 +143,7 @@ export const TicketList = () => {
     try {
       await ticketService.resolve(ticketId, notes.trim());
       await fetchTickets();
+      await fetchStatusCounts();
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Failed to resolve ticket.');
     } finally {
@@ -130,6 +178,7 @@ export const TicketList = () => {
     try {
       await ticketService.close(ticketId);
       await fetchTickets();
+      await fetchStatusCounts();
     } catch (err: any) {
       alert(err?.response?.data?.detail || 'Failed to close ticket.');
     } finally {
@@ -154,65 +203,15 @@ export const TicketList = () => {
     return <span className="badge badge-low">LOW</span>;
   };
 
-  // Filter client-side by status, priority, category & search
-  const filteredTickets = tickets.filter((t) => {
-    // 1. Status Filter Tab
-    if (statusFilter === 'OPEN' && t.status !== 'OPEN') return false;
-    if (statusFilter === 'IN_PROGRESS' && t.status !== 'IN_PROGRESS' && t.status !== 'ASSIGNED') return false;
-    if (statusFilter === 'RESOLVED' && t.status !== 'RESOLVED') return false;
-    if (statusFilter === 'CLOSED' && t.status !== 'CLOSED') return false;
-
-    // 2. Dropdown Filters
-    if (priorityFilter && t.priority !== priorityFilter) return false;
-    if (categoryFilter && t.category !== categoryFilter) return false;
-
-    // 3. Search Query
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      const num = (t.ticket_number || t.ticket_id || `INC-${t.id}`).toLowerCase();
-      const title = (t.title || '').toLowerCase();
-      const desc = (t.description || '').toLowerCase();
-      const cat = (t.category || '').toLowerCase();
-      const prio = (t.priority || '').toLowerCase();
-      const req = (
-        t.created_by_name ||
-        (typeof t.created_by === 'object' && t.created_by ? (t.created_by as any).full_name : '') ||
-        ''
-      ).toLowerCase();
-      const ass = (
-        t.assigned_to_name ||
-        (typeof t.assigned_to === 'object' && t.assigned_to ? (t.assigned_to as any).full_name : '') ||
-        ''
-      ).toLowerCase();
-      const dev = (
-        t.asset
-          ? `${t.asset.asset_tag || ''} ${t.asset.brand || ''} ${t.asset.model || ''}`
-          : ''
-      ).toLowerCase();
-
-      if (
-        !num.includes(q) &&
-        !title.includes(q) &&
-        !desc.includes(q) &&
-        !cat.includes(q) &&
-        !prio.includes(q) &&
-        !req.includes(q) &&
-        !ass.includes(q) &&
-        !dev.includes(q)
-      ) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  const paginatedTickets = tickets;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
   // Accurate counts for status tabs (always computed from full dataset)
-  const totalCount = tickets.length;
-  const openCount = tickets.filter((t) => t.status === 'OPEN').length;
-  const inProgressCount = tickets.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'ASSIGNED').length;
-  const resolvedCount = tickets.filter((t) => t.status === 'RESOLVED').length;
-  const closedCount = tickets.filter((t) => t.status === 'CLOSED').length;
+  const totalCount = statusCounts.total;
+  const openCount = statusCounts.open;
+  const inProgressCount = statusCounts.inProgress;
+  const resolvedCount = statusCounts.resolved;
+  const closedCount = statusCounts.closed;
 
   return (
     <div className="tickets-management-page">
@@ -342,7 +341,7 @@ export const TicketList = () => {
               🔄 Retry Connection
             </button>
           </div>
-        ) : filteredTickets.length === 0 ? (
+        ) : paginatedTickets.length === 0 ? (
           <div className="dash-empty-tickets" style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
             <span style={{ fontSize: '2.5rem' }}>🎫</span>
             <h3 style={{ margin: '0.75rem 0 0.25rem 0' }}>No Tickets Found</h3>
@@ -366,7 +365,7 @@ export const TicketList = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredTickets.map((ticket) => {
+              {paginatedTickets.map((ticket) => {
                 const ticketNumber = ticket.ticket_number || ticket.ticket_id || `INC-${ticket.id}`;
                 const createdByName =
                   ticket.created_by_name ||
@@ -603,8 +602,36 @@ export const TicketList = () => {
 
         <div className="inventory-pagination">
           <div className="pagination-count">
-            Showing <strong>{filteredTickets.length}</strong> of <strong>{totalCount}</strong> support tickets
+            Showing <strong>{totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</strong> -{' '}
+            <strong>{Math.min(currentPage * itemsPerPage, totalItems)}</strong> of <strong>{totalItems}</strong> support tickets
           </div>
+          {totalPages > 1 && (
+            <div className="pagination-controls">
+              <button
+                className="page-btn"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                ‹
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  className={`page-btn ${currentPage === page ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                className="page-btn"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                ›
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

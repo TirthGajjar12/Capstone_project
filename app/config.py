@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev_insecure_secret_key_change_in_production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    RSA_PRIVATE_KEY_PATH: str = "keys/rsa_private.pem"
+    RSA_PRIVATE_KEY_PEM: str = ""
 
     # CORS Allowed Origins (comma-separated list for production configuration)
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"

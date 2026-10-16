@@ -1,6 +1,11 @@
 import { api } from './api';
 import { Ticket, Asset, User } from '../types';
 
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+}
+
 /**
  * Ticket API calls — matches the FastAPI `/tickets` router.
  */
@@ -14,6 +19,28 @@ export const ticketService = {
     const query = params.toString() ? `?${params.toString()}` : '';
     const response = await api.get<Ticket[]>(`/tickets/${query}`);
     return response.data;
+  },
+
+  async getPaginated(
+    status?: string,
+    priority?: string,
+    category?: string,
+    search?: string,
+    skip: number = 0,
+    limit: number = 10
+  ): Promise<PaginatedResult<Ticket>> {
+    const params = new URLSearchParams();
+    if (status && status !== 'ALL') params.append('status', status);
+    if (priority) params.append('priority', priority);
+    if (category) params.append('category', category);
+    if (search) params.append('search', search);
+    params.append('skip', String(skip));
+    params.append('limit', String(limit));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const response = await api.get<Ticket[]>(`/tickets/${query}`);
+    const totalHeader = response.headers['x-total-count'];
+    const total = totalHeader ? parseInt(totalHeader, 10) : response.data.length;
+    return { items: response.data, total };
   },
 
   async getById(id: number): Promise<Ticket> {
@@ -67,6 +94,26 @@ export const assetService = {
     const query = params.toString() ? `?${params.toString()}` : '';
     const response = await api.get<Asset[]>(`/assets/${query}`);
     return response.data;
+  },
+
+  async getPaginated(
+    status?: string,
+    type?: string,
+    search?: string,
+    skip: number = 0,
+    limit: number = 10
+  ): Promise<PaginatedResult<Asset>> {
+    const params = new URLSearchParams();
+    if (status) params.append('asset_status', status);
+    if (type && type !== 'ALL') params.append('asset_type', type);
+    if (search) params.append('search', search);
+    params.append('skip', String(skip));
+    params.append('limit', String(limit));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const response = await api.get<Asset[]>(`/assets/${query}`);
+    const totalHeader = response.headers['x-total-count'];
+    const total = totalHeader ? parseInt(totalHeader, 10) : response.data.length;
+    return { items: response.data, total };
   },
 
   async getById(id: string): Promise<Asset> {

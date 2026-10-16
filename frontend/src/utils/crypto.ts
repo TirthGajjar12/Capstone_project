@@ -5,17 +5,27 @@ let cachedPublicKey: CryptoKey | null = null;
 /**
  * Encrypts a password on the client using Asymmetric RSA-OAEP + SHA-256 WebCrypto.
  * Returns the ciphertext prefixed with 'RSA:<base64>'.
- * If WebCrypto is not supported, safely falls back to returning the raw password.
+ * Fails closed: throws an explicit error if Web Crypto is unavailable or if encryption fails,
+ * preventing any silent transmission of plaintext credentials.
  */
 export async function encryptPassword(password: string): Promise<string> {
-  if (!password || typeof window === 'undefined' || !window.crypto?.subtle) {
-    return password;
+  if (!password) {
+    throw new Error('Password credential is required.');
+  }
+
+  if (typeof window === 'undefined' || !window.crypto?.subtle) {
+    throw new Error(
+      'Web Crypto API is unavailable. Secure authentication requires a modern browser running in a secure context (HTTPS or localhost).'
+    );
   }
 
   try {
     if (!cachedPublicKey) {
       // 1. Fetch the server's RSA public key in PEM format
       const { data } = await api.get<{ public_key: string }>('/auth/public-key');
+      if (!data?.public_key) {
+        throw new Error('Failed to retrieve the server encryption public key.');
+      }
 
       // 2. Strip PEM header/footer and whitespaces to get raw base64
       const cleanB64 = data.public_key
@@ -59,8 +69,11 @@ export async function encryptPassword(password: string): Promise<string> {
     }
 
     return `RSA:${window.btoa(binary)}`;
-  } catch (err) {
-    console.warn('Asymmetric client-side encryption fallback:', err);
-    return password;
+  } catch (err: any) {
+    // Invalidate cached key in case server rotated or restarted
+    cachedPublicKey = null;
+    throw new Error(
+      err?.message || 'Secure credential encryption failed. Operation aborted to protect credentials.'
+    );
   }
 }

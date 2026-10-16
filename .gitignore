@@ -15,6 +15,9 @@ ENV/
 .env.dev
 .env.prod
 .env.qa
+keys/
+*.pem
+*.key
 
 # Testing & Coverage
 .pytest_cache/
