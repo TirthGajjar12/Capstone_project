@@ -71,7 +71,7 @@ export const TicketAssignment: React.FC = () => {
   const fetchTickets = async () => {
     setLoading(true);
     try {
-      const data = await ticketService.getAll();
+      const data = await ticketService.getAll(undefined, undefined, 0, 500);
       setTickets(data);
     } catch {
       setTickets([]);

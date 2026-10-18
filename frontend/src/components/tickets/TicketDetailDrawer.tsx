@@ -8,7 +8,7 @@ interface TicketDetailDrawerProps {
   ticket: Ticket | null;
   isOpen: boolean;
   onClose: () => void;
-  isEmployee: boolean;
+  isEmployee?: boolean;
   onCloseTicket?: (ticketId: number) => void;
   onOpenAssignAsset?: (ticket: Ticket) => void;
   onResolveTicket?: (ticketId: number) => void;
@@ -19,7 +19,7 @@ export const TicketDetailDrawer: React.FC<TicketDetailDrawerProps> = ({
   ticket,
   isOpen,
   onClose,
-  isEmployee,
+  isEmployee: isEmployeeProp,
   onCloseTicket,
   onOpenAssignAsset,
   onResolveTicket,
@@ -49,6 +49,7 @@ export const TicketDetailDrawer: React.FC<TicketDetailDrawerProps> = ({
 
   const isAdmin = user?.role === 'ADMIN';
   const isSupport = user?.role === 'SUPPORT';
+  const isEmployee = user ? user.role === 'EMPLOYEE' : Boolean(isEmployeeProp);
   const isAssignedToMe = Boolean(
     user &&
     (currentTicket.assigned_to_id === user.id ||
