@@ -5,6 +5,7 @@ import { ticketService } from '../../services/ticketService';
 import { Ticket } from '../../types';
 import AssignTicketDrawer from './AssignTicketDrawer';
 import FulfillRequestDrawer from './FulfillRequestDrawer';
+import TicketDetailDrawer from './TicketDetailDrawer';
 import useWebSocket from '../../hooks/useWebSocket';
 import { IconBox, IconLaptop, IconUser } from '../common/Icons';
 
@@ -31,6 +32,15 @@ export const TicketAssignment: React.FC = () => {
   // Selected ticket for hardware fulfillment drawer
   const [fulfillTicket, setFulfillTicket] = useState<Ticket | null>(null);
   const [isFulfillDrawerOpen, setIsFulfillDrawerOpen] = useState(false);
+
+  // Selected ticket for inspection & priority editing drawer
+  const [detailTicket, setDetailTicket] = useState<Ticket | null>(null);
+  const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
+
+  const handleOpenDetail = (ticket: Ticket) => {
+    setDetailTicket(ticket);
+    setIsDetailDrawerOpen(true);
+  };
 
   const isHardwareRequest = (t: Ticket) => {
     const title = (t.title || '').toLowerCase();
@@ -92,6 +102,18 @@ export const TicketAssignment: React.FC = () => {
   const highPriorityCount = tickets.filter(
     (t) => (t.priority === 'CRITICAL' || t.priority === 'HIGH') && t.status !== 'CLOSED' && t.status !== 'RESOLVED'
   ).length;
+
+  // Workload mapping: engineer ID -> number of active (ASSIGNED / IN_PROGRESS) tickets
+  const engineerWorkloads = React.useMemo(() => {
+    const map: Record<number, number> = {};
+    tickets.forEach((t) => {
+      const aid = t.assigned_to_id || (typeof t.assigned_to === 'object' ? (t.assigned_to as any)?.id : null);
+      if (aid && (t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS')) {
+        map[aid] = (map[aid] || 0) + 1;
+      }
+    });
+    return map;
+  }, [tickets]);
 
   // Filter tickets
   const filtered = tickets.filter((t) => {
@@ -362,7 +384,7 @@ export const TicketAssignment: React.FC = () => {
                 <th style={{ width: '80px' }}>PRIORITY</th>
                 <th style={{ width: '100px' }}>STATUS</th>
                 <th style={{ width: '120px' }}>REQUESTED BY</th>
-                <th style={{ width: '130px' }}>ASSIGNED ENGINEER</th>
+                <th style={{ width: '180px' }}>ASSIGNED ENGINEER</th>
                 <th style={{ textAlign: 'right', width: '100px' }}>ACTION</th>
               </tr>
             </thead>
@@ -382,13 +404,21 @@ export const TicketAssignment: React.FC = () => {
                     ? (ticket.assigned_to as any).full_name
                     : null);
 
-                const isAssigned = Boolean(assignedName || ticket.assigned_to_id);
+                const assignedId = ticket.assigned_to_id || (typeof ticket.assigned_to === 'object' ? (ticket.assigned_to as any)?.id : null);
+                const workload = assignedId ? engineerWorkloads[assignedId] || 0 : 0;
+                const isAssigned = Boolean(assignedName || assignedId);
 
                 return (
                   <tr key={ticket.id} className="inventory-row">
                     {/* Ticket ID */}
                     <td className="cell-tag" style={{ whiteSpace: 'nowrap' }}>
-                      <strong>{ticketNumber}</strong>
+                      <strong
+                        onClick={() => handleOpenDetail(ticket)}
+                        style={{ cursor: 'pointer', color: 'var(--color-accent)' }}
+                        title="Click to view details and change priority"
+                      >
+                        {ticketNumber}
+                      </strong>
                     </td>
 
                     {/* Title & Asset info strictly single line */}
@@ -398,13 +428,16 @@ export const TicketAssignment: React.FC = () => {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflow: 'hidden' }}>
                         <span
+                          onClick={() => handleOpenDetail(ticket)}
                           style={{
                             fontWeight: 600,
                             color: 'var(--color-text-primary)',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
+                            cursor: 'pointer',
                           }}
+                          title="Click to view details and change priority"
                         >
                           {ticket.title}
                         </span>
@@ -438,7 +471,13 @@ export const TicketAssignment: React.FC = () => {
                     </td>
 
                     {/* Priority */}
-                    <td>{getPriorityBadge(ticket.priority)}</td>
+                    <td
+                      onClick={() => handleOpenDetail(ticket)}
+                      style={{ cursor: 'pointer' }}
+                      title="Click to view details or edit priority"
+                    >
+                      {getPriorityBadge(ticket.priority)}
+                    </td>
 
                     {/* Status */}
                     <td>{getStatusBadge(ticket.status)}</td>
@@ -451,15 +490,61 @@ export const TicketAssignment: React.FC = () => {
                       👤 {requesterName}
                     </td>
 
-                    {/* Current Assignee */}
+                    {/* Current Assignee, Workload & Auto/Manual Indicator */}
                     <td
-                      style={{ maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem' }}
-                      title={isAssigned ? (assignedName || `Staff #${ticket.assigned_to_id}`) : 'Unassigned'}
+                      style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem' }}
+                      title={isAssigned ? `${assignedName || `Staff #${assignedId}`} (${workload} active tickets) [${ticket.assignment_mode || 'MANUAL'}]` : 'Unassigned'}
                     >
                       {isAssigned ? (
-                        <span style={{ fontWeight: 600, color: '#2563eb' }}>
-                          🛠️ {assignedName || `Staff #${ticket.assigned_to_id}`}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                          <span style={{ fontWeight: 600, color: '#2563eb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            🛠️ {assignedName || `Staff #${assignedId}`}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '0.65rem',
+                              color: '#4b5563',
+                              background: 'rgba(107, 114, 128, 0.1)',
+                              padding: '0.05rem 0.3rem',
+                              borderRadius: '4px',
+                              flexShrink: 0,
+                            }}
+                            title={`Active workload: ${workload} tickets`}
+                          >
+                            {workload}
+                          </span>
+                          {ticket.assignment_mode === 'AUTO' ? (
+                            <span
+                              style={{
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                padding: '0.08rem 0.32rem',
+                                borderRadius: '4px',
+                                background: 'rgba(99, 102, 241, 0.12)',
+                                color: '#4f46e5',
+                                flexShrink: 0,
+                              }}
+                              title="Assigned automatically by system workload dispatch"
+                            >
+                              🤖 Auto
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                padding: '0.08rem 0.32rem',
+                                borderRadius: '4px',
+                                background: 'rgba(107, 114, 128, 0.12)',
+                                color: '#4b5563',
+                                flexShrink: 0,
+                              }}
+                              title="Assigned manually by administrator"
+                            >
+                              👤 Manual
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span
                           style={{
@@ -574,6 +659,7 @@ export const TicketAssignment: React.FC = () => {
         }}
         onAssigned={fetchTickets}
         onSwitchToHardware={handleOpenFulfill}
+        allTickets={tickets}
       />
 
       {/* Hardware Request Fulfillment Drawer (shows available hardware inventory) */}
@@ -585,6 +671,22 @@ export const TicketAssignment: React.FC = () => {
           setFulfillTicket(null);
         }}
         onAssignedAndResolved={fetchTickets}
+      />
+
+      {/* Ticket Detail & Priority Edit Drawer */}
+      <TicketDetailDrawer
+        ticket={detailTicket}
+        isOpen={isDetailDrawerOpen}
+        onClose={() => {
+          setIsDetailDrawerOpen(false);
+          setDetailTicket(null);
+        }}
+        isEmployee={false}
+        onOpenAssignAsset={handleOpenFulfill}
+        onTicketUpdated={(updated) => {
+          setDetailTicket(updated);
+          setTickets((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+        }}
       />
     </div>
   );

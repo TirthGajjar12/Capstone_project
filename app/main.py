@@ -32,6 +32,8 @@ async def lifespan(app: FastAPI):
     if settings.APP_ENV != "test":
         try:
             Base.metadata.create_all(bind=engine)
+            from app.database.migrations import run_migrations
+            run_migrations(engine)
         except Exception:
             # Non-blocking if database is offline during offline tool tasks
             pass

@@ -10,9 +10,12 @@ from app.models.asset import Asset, AssetStatus, AssetAssignment
 from app.models.user import User
 from app.schemas.ticket import (
     TicketCreate, TicketResponse, TicketAssign, 
-    TicketUpdateStatus, TicketResolve
+    TicketUpdateStatus, TicketResolve, TicketPriorityUpdate
 )
-from app.services.ticket_service import calculate_sla_deadline, classify_ticket
+from app.services.ticket_service import (
+    calculate_sla_deadline, classify_ticket,
+    find_least_loaded_support_engineer, is_equipment_fulfillment_request
+)
 from app.api.deps import get_current_user, require_role
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
@@ -26,18 +29,16 @@ async def create_ticket(
 ):
     """
     Create a new support ticket (Employees only):
-    - Auto-classifies category & priority using regex/rules if not explicitly provided
+    - Auto-classifies category & priority using regex/rules (priority is server-controlled to prevent triage bypassing)
+    - Automatically assigns normal support tickets to the least-loaded active SUPPORT engineer
+    - Preserves equipment-fulfillment requests as OPEN for hardware inventory provisioning
     - Calculates SLA deadline based on priority (e.g. CRITICAL=2h, HIGH=4h)
     - Generates ticket number (e.g. INC-1001)
     """
-    # 1. Auto-classification if needed
-    category = ticket_in.category
-    priority = ticket_in.priority
-    
-    if not category or not priority:
-        auto_cat, auto_pri = classify_ticket(f"{ticket_in.title} {ticket_in.description}")
-        category = category or auto_cat
-        priority = priority or auto_pri
+    # 1. Server-controlled classification to prevent employee priority tampering
+    auto_cat, auto_pri = classify_ticket(f"{ticket_in.title} {ticket_in.description}")
+    category = ticket_in.category or auto_cat
+    priority = auto_pri  # Server-controlled initial priority
 
     # Default to HARDWARE category if an asset was attached and no specific category was matched
     if ticket_in.asset_id and category == TicketCategory.OTHER:
@@ -58,15 +59,37 @@ async def create_ticket(
                 detail="Not authorized: You can only reference hardware assets currently assigned to you."
             )
 
-    # 4. Create ticket and use DB-generated ID for a race-condition-safe ticket number
+    # 4. Equipment fulfillment check vs Automatic Assignment
+    is_fulfill = is_equipment_fulfillment_request(ticket_in.title, ticket_in.description, category)
+    assigned_engineer = None
+    assignment_mode = None
+
+    if is_fulfill:
+        # Hardware requests stay in OPEN status for inventory allocation
+        ticket_status = TicketStatus.OPEN
+        assigned_to_id = None
+    else:
+        # Auto-assign to least loaded active SUPPORT engineer
+        assigned_engineer = find_least_loaded_support_engineer(db)
+        if assigned_engineer:
+            ticket_status = TicketStatus.ASSIGNED
+            assigned_to_id = assigned_engineer.id
+            assignment_mode = "AUTO"
+        else:
+            ticket_status = TicketStatus.OPEN
+            assigned_to_id = None
+
+    # 5. Create ticket and use DB-generated ID for a race-condition-safe ticket number
     new_ticket = Ticket(
         ticket_number="TEMP",  # Placeholder, replaced after flush
         title=ticket_in.title,
         description=ticket_in.description,
         category=category,
         priority=priority,
-        status=TicketStatus.OPEN,
+        status=ticket_status,
         created_by_id=current_user.id,
+        assigned_to_id=assigned_to_id,
+        assignment_mode=assignment_mode,
         asset_id=ticket_in.asset_id,
         sla_deadline=sla_deadline,
         created_at=now
@@ -76,15 +99,30 @@ async def create_ticket(
     db.flush()  # Get DB-generated ID without committing
     new_ticket.ticket_number = f"INC-{1000 + new_ticket.id}"
 
-    # Log creation in audit history in the SAME database transaction
-    history = TicketHistory(
+    # Log creation in audit history
+    history_create = TicketHistory(
         ticket_id=new_ticket.id,
         changed_by_id=current_user.id,
+        action_type="CREATED",
         previous_status=None,
         new_status=TicketStatus.OPEN.value,
         comment="Ticket created."
     )
-    db.add(history)
+    db.add(history_create)
+
+    # If auto-assigned, log the system assignment in the same transaction
+    if assigned_engineer:
+        history_assign = TicketHistory(
+            ticket_id=new_ticket.id,
+            changed_by_id=None,  # None indicates SYSTEM
+            action_type="AUTO_ASSIGNMENT",
+            previous_status=TicketStatus.OPEN.value,
+            new_status=TicketStatus.ASSIGNED.value,
+            new_assignee_id=assigned_engineer.id,
+            comment=f"Ticket automatically assigned to {assigned_engineer.full_name} ({assigned_engineer.email}) based on workload distribution."
+        )
+        db.add(history_assign)
+
     db.commit()
     db.refresh(new_ticket)
 
@@ -97,10 +135,30 @@ async def create_ticket(
             "title": new_ticket.title,
             "category": new_ticket.category.value,
             "priority": new_ticket.priority.value,
-            "status": new_ticket.status.value
+            "status": new_ticket.status.value,
+            "assigned_to_id": new_ticket.assigned_to_id,
+            "assigned_to_name": assigned_engineer.full_name if assigned_engineer else None,
+            "assignment_mode": new_ticket.assignment_mode,
         },
-        creator_id=new_ticket.created_by_id
+        creator_id=new_ticket.created_by_id,
+        assigned_to_id=new_ticket.assigned_to_id
     )
+
+    if assigned_engineer:
+        await ws_manager.broadcast_ticket_event(
+            "TICKET_ASSIGNED",
+            {
+                "id": new_ticket.id,
+                "ticket_id": new_ticket.id,
+                "ticket_number": new_ticket.ticket_number,
+                "status": new_ticket.status.value,
+                "assigned_to_id": new_ticket.assigned_to_id,
+                "assigned_to_name": assigned_engineer.full_name,
+                "assignment_mode": "AUTO"
+            },
+            creator_id=new_ticket.created_by_id,
+            assigned_to_id=new_ticket.assigned_to_id
+        )
 
     return new_ticket
 
@@ -181,24 +239,26 @@ async def assign_ticket(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["ADMIN", "SUPPORT"]))
 ):
-    """Assign ticket to an IT Support engineer."""
+    """Assign ticket to an IT Support engineer or reassign an existing assignment."""
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found.")
 
-    # Bug 10 fix: assignment only allowed from OPEN or ASSIGNED
-    if ticket.status not in (TicketStatus.OPEN, TicketStatus.ASSIGNED):
+    # Reassignment rules:
+    # Terminal tickets (RESOLVED / CLOSED) can NEVER be assigned or reassigned
+    if ticket.status in (TicketStatus.RESOLVED, TicketStatus.CLOSED):
         raise HTTPException(
             status_code=409,
-            detail=f"Cannot assign a ticket that is already {ticket.status.value}."
+            detail=f"Cannot assign or reassign a ticket that is already {ticket.status.value}."
         )
 
-    support_user = db.query(User).filter(User.id == assign_in.assigned_to_id).first()
-    if not support_user or support_user.role not in ["SUPPORT", "ADMIN"]:
-        raise HTTPException(status_code=400, detail="Target user must have SUPPORT or ADMIN role.")
-
-    # Non-admin support staff can only take an unassigned ticket or assign to themselves
+    # Non-admin support staff: can only take an unassigned ticket or assign to themselves
     if current_user.role != "ADMIN":
+        if ticket.status not in (TicketStatus.OPEN, TicketStatus.ASSIGNED):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot assign a ticket that is in {ticket.status.value} status."
+            )
         if ticket.assigned_to_id is not None and ticket.assigned_to_id != current_user.id:
             raise HTTPException(
                 status_code=403,
@@ -210,16 +270,37 @@ async def assign_ticket(
                 detail="Support staff can only assign tickets to themselves."
             )
 
+    support_user = db.query(User).filter(User.id == assign_in.assigned_to_id, User.is_active == True).first()
+    if not support_user or support_user.role not in ["SUPPORT", "ADMIN"]:
+        raise HTTPException(status_code=400, detail="Target user must be an active user with SUPPORT or ADMIN role.")
+
+    is_reassignment = ticket.assigned_to_id is not None and ticket.assigned_to_id != support_user.id
+    old_assignee_id = ticket.assigned_to_id
+    old_assignee_name = ticket.assigned_to.full_name if ticket.assigned_to else None
     prev_status = ticket.status.value
+
     ticket.assigned_to_id = support_user.id
-    ticket.status = TicketStatus.ASSIGNED
+    if ticket.status == TicketStatus.OPEN:
+        ticket.status = TicketStatus.ASSIGNED
+    ticket.assignment_mode = "MANUAL"
+
+    action_type = "REASSIGNED" if is_reassignment else "ASSIGNED"
+    default_comment = (
+        f"Ticket reassigned from {old_assignee_name} to {support_user.full_name} ({support_user.email})."
+        if is_reassignment
+        else f"Ticket manually assigned to {support_user.full_name} ({support_user.email})."
+    )
+    comment = f"{assign_in.reason} ({default_comment})" if assign_in.reason else default_comment
 
     history = TicketHistory(
         ticket_id=ticket.id,
         changed_by_id=current_user.id,
+        action_type=action_type,
         previous_status=prev_status,
-        new_status=TicketStatus.ASSIGNED.value,
-        comment=f"Ticket assigned to {support_user.full_name} ({support_user.email})."
+        new_status=ticket.status.value,
+        previous_assignee_id=old_assignee_id,
+        new_assignee_id=support_user.id,
+        comment=comment
     )
     db.add(history)
     db.commit()
@@ -233,11 +314,79 @@ async def assign_ticket(
             "ticket_number": ticket.ticket_number,
             "status": ticket.status.value,
             "assigned_to_id": ticket.assigned_to_id,
-            "assigned_to_name": support_user.full_name
+            "assigned_to_name": support_user.full_name,
+            "assignment_mode": "MANUAL"
         },
         creator_id=ticket.created_by_id,
         assigned_to_id=ticket.assigned_to_id
     )
+
+    return ticket
+
+
+@router.patch("/{ticket_id}/priority", response_model=TicketResponse)
+async def update_ticket_priority(
+    ticket_id: int,
+    priority_in: TicketPriorityUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["ADMIN", "SUPPORT"]))
+):
+    """
+    Update ticket priority:
+    - Admin: can change priority for any active (non-completed) ticket.
+    - Support: can change priority for tickets assigned to them.
+    - Employees: strictly forbidden (403).
+    - Terminal tickets (RESOLVED / CLOSED): forbidden (409).
+    - Recalculates SLA deadline from the ticket's original created_at time without resetting clock.
+    """
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found.")
+
+    if ticket.status in (TicketStatus.RESOLVED, TicketStatus.CLOSED):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot change priority of a ticket that is already {ticket.status.value}."
+        )
+
+    if current_user.role == "SUPPORT" and ticket.assigned_to_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Support staff can only change priority for tickets assigned to them."
+        )
+
+    old_priority = ticket.priority
+    if old_priority != priority_in.priority:
+        ticket.priority = priority_in.priority
+        # Recalculate SLA deadline using original created_at time (never restart clock)
+        ticket.sla_deadline = calculate_sla_deadline(ticket.priority, start_time=ticket.created_at)
+
+        history = TicketHistory(
+            ticket_id=ticket.id,
+            changed_by_id=current_user.id,
+            action_type="PRIORITY_CHANGED",
+            previous_priority=old_priority.value,
+            new_priority=priority_in.priority.value,
+            comment=priority_in.reason or f"Priority changed from {old_priority.value} to {priority_in.priority.value}."
+        )
+        db.add(history)
+        db.commit()
+        db.refresh(ticket)
+
+        await ws_manager.broadcast_ticket_event(
+            "TICKET_PRIORITY_UPDATED",
+            {
+                "id": ticket.id,
+                "ticket_id": ticket.id,
+                "ticket_number": ticket.ticket_number,
+                "priority": ticket.priority.value,
+                "sla_deadline": ticket.sla_deadline.isoformat(),
+                "is_sla_breached": ticket.is_sla_breached,
+                "status": ticket.status.value,
+            },
+            creator_id=ticket.created_by_id,
+            assigned_to_id=ticket.assigned_to_id
+        )
 
     return ticket
 

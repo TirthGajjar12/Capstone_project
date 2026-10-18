@@ -176,15 +176,24 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
   };
 
   return (
-    <div className="drawer-overlay" onClick={onClose}>
-      <div className="drawer-panel" style={{ width: '480px' }} onClick={(e) => e.stopPropagation()}>
-        {/* Drawer Header */}
-        <div className="drawer-header">
+    <div className="enterprise-modal-overlay" onClick={onClose}>
+      <div
+        className="enterprise-modal-container"
+        style={{ width: '840px' }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fulfill-request-modal-title"
+      >
+        {/* Modal Header */}
+        <div className="enterprise-modal-header">
           <div>
-            <div className="drawer-kicker">EQUIPMENT FULFILLMENT</div>
-            <h2 className="drawer-title" style={{ fontSize: '1.35rem' }}>Assign Hardware</h2>
+            <div className="enterprise-modal-kicker">EQUIPMENT FULFILLMENT & INVENTORY</div>
+            <h2 id="fulfill-request-modal-title" className="enterprise-modal-title">
+              Assign Hardware to Request
+            </h2>
           </div>
-          <button className="drawer-close-btn" onClick={onClose} aria-label="Close drawer">
+          <button className="enterprise-modal-close" onClick={onClose} aria-label="Close modal">
             ✕
           </button>
         </div>
@@ -388,23 +397,23 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
           </div>
         )}
 
-        {/* Drawer Footer Actions */}
-        <div className="drawer-footer" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Modal Footer Actions */}
+        <div className="enterprise-modal-footer" style={{ marginTop: 'auto' }}>
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn-warm-secondary"
             onClick={handleResolveWithoutAsset}
             disabled={submitting}
-            style={{ fontSize: '0.76rem', padding: '0.45rem 0.75rem' }}
+            style={{ fontSize: '0.78rem', padding: '0.45rem 0.8rem' }}
             title="Resolve without assigning an asset from inventory"
           >
             Resolve without Asset
           </button>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
             <button
               type="button"
-              className="btn btn-secondary"
+              className="btn-warm-secondary"
               onClick={onClose}
               disabled={submitting}
               style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem' }}
@@ -413,15 +422,10 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
             </button>
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn-warm-terracotta"
               disabled={!selectedAsset || submitting}
               onClick={handleConfirmAssign}
-              style={{
-                fontSize: '0.8rem',
-                padding: '0.45rem 0.95rem',
-                background: selectedAsset ? '#4f46e5' : undefined,
-                borderColor: selectedAsset ? '#4338ca' : undefined,
-              }}
+              style={{ fontSize: '0.8rem', padding: '0.45rem 0.95rem' }}
             >
               {submitting ? 'Assigning…' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><IconBox size={13} /> Assign &amp; Resolve</span>}
             </button>

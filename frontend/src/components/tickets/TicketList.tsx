@@ -504,9 +504,16 @@ export const TicketList = () => {
                       title={assignedName || 'Unassigned'}
                     >
                       {assignedName ? (
-                        <span style={{ color: isAssignedToMe ? '#6366f1' : 'inherit', fontWeight: isAssignedToMe ? 700 : 500 }}>
-                          {assignedName} {isAssignedToMe && '(You)'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', overflow: 'hidden' }}>
+                          <span style={{ color: isAssignedToMe ? '#6366f1' : 'inherit', fontWeight: isAssignedToMe ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {assignedName} {isAssignedToMe && '(You)'}
+                          </span>
+                          {ticket.assignment_mode === 'AUTO' && (
+                            <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '0.05rem 0.25rem', borderRadius: '3px', background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5', flexShrink: 0 }} title="Auto-assigned">
+                              🤖 Auto
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span style={{ color: '#888', fontStyle: 'italic' }}>Unassigned</span>
                       )}
@@ -671,6 +678,11 @@ export const TicketList = () => {
         onCloseTicket={handleClose}
         onOpenAssignAsset={handleOpenFulfill}
         onResolveTicket={handleResolve}
+        onTicketUpdated={(updated) => {
+          setDetailTicket(updated);
+          setTickets((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+          fetchStatusCounts();
+        }}
       />
     </div>
   );

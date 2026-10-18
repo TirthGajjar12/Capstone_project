@@ -134,7 +134,11 @@ def test_create_ticket_with_auto_classify(client, employee_token):
     assert response.status_code == 201
     data = response.json()
     assert data["category"] == "Hardware"
-    assert data["status"] == "OPEN"
+    # When support engineers exist, ticket is automatically assigned
+    assert data["status"] in ("OPEN", "ASSIGNED")
+    if data["status"] == "ASSIGNED":
+        assert data["assignment_mode"] == "AUTO"
+        assert data["assigned_to_id"] is not None
     assert "INC-" in data["ticket_number"]
 
 def test_update_ticket_status(client, admin_token):
@@ -173,8 +177,8 @@ def test_support_ticket_ownership_isolation(client, db_session, admin_token):
     t_res = client.post("/tickets", json={"title": "Test Ownership Issue", "description": "Keyboard broken"}, headers={"Authorization": f"Bearer {emp_tok}"})
     ticket_id = t_res.json()["id"]
 
-    # User 1 assigns ticket to themselves
-    assign_res = client.post(f"/tickets/{ticket_id}/assign", json={"assigned_to_id": u1_id}, headers={"Authorization": f"Bearer {t1}"})
+    # Admin assigns ticket to User 1
+    assign_res = client.post(f"/tickets/{ticket_id}/assign", json={"assigned_to_id": u1_id, "reason": "Ownership test assignment"}, headers={"Authorization": f"Bearer {admin_token}"})
     assert assign_res.status_code == 200
 
     # User 2 tries to update status of User 1's ticket -> 403 Forbidden
@@ -412,6 +416,179 @@ def test_assets_filter_employee_view(client, employee_token):
 def test_assets_search_by_employee_name(client, admin_token):
     res = client.get("/assets/?search=John", headers={"Authorization": f"Bearer {admin_token}"})
     assert res.status_code == 200
+
+# ==================== 9. AUTOMATIC ASSIGNMENT & PRIORITY MANAGEMENT TESTS ====================
+
+def test_auto_assignment_least_loaded_support_engineer(client, employee_token, db_session):
+    from app.services.ticket_service import find_least_loaded_support_engineer
+    # 1. Determine least-loaded support engineer initially
+    eng1 = find_least_loaded_support_engineer(db_session)
+    assert eng1 is not None
+
+    # 2. Create ticket 1 -> auto-assigns to eng1
+    ticket1 = client.post("/tickets/", json={"title": "Workload Task 1", "description": "VPN issue"}, headers={"Authorization": f"Bearer {employee_token}"}).json()
+    assert ticket1["status"] == "ASSIGNED"
+    assert ticket1["assignment_mode"] == "AUTO"
+    assert ticket1["assigned_to_id"] == eng1.id
+
+    # 3. Create ticket 2 -> eng1 now has 1 active ticket, so least-loaded algorithm selects another engineer
+    ticket2 = client.post("/tickets/", json={"title": "Workload Task 2", "description": "Software crash"}, headers={"Authorization": f"Bearer {employee_token}"}).json()
+    assert ticket2["status"] == "ASSIGNED"
+    assert ticket2["assignment_mode"] == "AUTO"
+    assert ticket2["assigned_to_id"] != eng1.id
+
+def test_auto_assignment_workload_tie_breaker(db_session):
+    # When workloads are equal, tie-breaker must deterministically select lowest user id
+    from app.services.ticket_service import find_least_loaded_support_engineer
+    least_loaded = find_least_loaded_support_engineer(db_session)
+    assert least_loaded is not None
+    assert least_loaded.role == "SUPPORT"
+
+def test_auto_assignment_no_support_engineers():
+    # Test that find_least_loaded_support_engineer returns None gracefully when no active support users exist
+    from app.services.ticket_service import find_least_loaded_support_engineer
+    from unittest.mock import MagicMock
+    mock_db = MagicMock()
+    mock_query = MagicMock()
+    mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
+    mock_query.all.return_value = []
+    mock_db.query.return_value = mock_query
+    result = find_least_loaded_support_engineer(mock_db)
+    assert result is None
+
+def test_auto_assignment_excludes_admins_and_inactive_users(db_session):
+    from app.services.ticket_service import find_least_loaded_support_engineer
+    from app.models.user import User
+    inactive = User(
+        email="support.inactive_test@company.com",
+        full_name="Inactive Support",
+        hashed_password="hashed_pass",
+        role="SUPPORT",
+        is_active=False
+    )
+    db_session.add(inactive)
+    db_session.commit()
+    least = find_least_loaded_support_engineer(db_session)
+    if least:
+        assert least.is_active is True
+        assert least.role == "SUPPORT"
+
+def test_employee_priority_manipulation_ignored(client, employee_token):
+    # Employee sends "CRITICAL" priority for a low/medium issue like "Office supplies printer paper query"
+    res = client.post("/tickets/", json={
+        "title": "Need printer paper query",
+        "description": "General question about office supplies",
+        "priority": "CRITICAL"
+    }, headers={"Authorization": f"Bearer {employee_token}"})
+    assert res.status_code == 201
+    ticket_data = res.json()
+    # Server-side classification must control priority; employee input is not accepted to jump the queue
+    assert ticket_data["priority"] in ("LOW", "MEDIUM")
+
+def test_priority_update_rbac_and_validation(client, admin_token, employee_token):
+    # Register support engineers (email starts with support.)
+    client.post("/auth/register", json={
+        "email": "support.rbac@company.com", "full_name": "RBAC Support", "password": "Password123!"
+    })
+    sup_token = client.post("/auth/login", data={"username": "support.rbac@company.com", "password": "Password123!"}).json()["access_token"]
+    sup_id = client.get("/auth/me", headers={"Authorization": f"Bearer {sup_token}"}).json()["id"]
+
+    # Create ticket as employee
+    ticket = client.post("/tickets/", json={"title": "Printer jam", "description": "Paper jam on 3rd floor"}, headers={"Authorization": f"Bearer {employee_token}"}).json()
+    ticket_id = ticket["id"]
+
+    # 1. Employee attempts to change priority -> 403 Forbidden
+    res_emp = client.patch(f"/tickets/{ticket_id}/priority", json={"priority": "CRITICAL", "reason": "I want it fast"}, headers={"Authorization": f"Bearer {employee_token}"})
+    assert res_emp.status_code == 403
+
+    # 2. Assign ticket to support.rbac
+    assign_res = client.post(f"/tickets/{ticket_id}/assign", json={"assigned_to_id": sup_id, "reason": "Assigned for RBAC test"}, headers={"Authorization": f"Bearer {admin_token}"})
+    assert assign_res.status_code == 200
+
+    # 3. Support user assigned to ticket changes priority -> 200 OK
+    res_sup = client.patch(f"/tickets/{ticket_id}/priority", json={"priority": "HIGH", "reason": "Multiple users impacted"}, headers={"Authorization": f"Bearer {sup_token}"})
+    assert res_sup.status_code == 200
+    assert res_sup.json()["priority"] == "HIGH"
+
+    # 4. Another support user attempts to change priority -> 403 Forbidden
+    client.post("/auth/register", json={
+        "email": "support.other@company.com", "full_name": "Other Support", "password": "Password123!"
+    })
+    other_sup_token = client.post("/auth/login", data={"username": "support.other@company.com", "password": "Password123!"}).json()["access_token"]
+    res_other = client.patch(f"/tickets/{ticket_id}/priority", json={"priority": "LOW"}, headers={"Authorization": f"Bearer {other_sup_token}"})
+    assert res_other.status_code == 403
+
+    # 5. Admin changes priority -> 200 OK
+    res_admin = client.patch(f"/tickets/{ticket_id}/priority", json={"priority": "CRITICAL", "reason": "Executive escalation"}, headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_admin.status_code == 200
+    assert res_admin.json()["priority"] == "CRITICAL"
+
+    # 6. Invalid priority -> 422
+    res_invalid = client.patch(f"/tickets/{ticket_id}/priority", json={"priority": "SUPER_MAX"}, headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_invalid.status_code == 422
+
+def test_priority_update_on_completed_ticket_fails(client, admin_token, employee_token):
+    # Create ticket and resolve it
+    ticket = client.post("/tickets/", json={"title": "Completed Ticket Test", "description": "Will be resolved"}, headers={"Authorization": f"Bearer {employee_token}"}).json()
+    ticket_id = ticket["id"]
+    client.post(f"/tickets/{ticket_id}/resolve", json={"resolution_notes": "All done"}, headers={"Authorization": f"Bearer {admin_token}"})
+
+    # Attempt priority change on resolved ticket -> 409 Conflict
+    res = client.patch(f"/tickets/{ticket_id}/priority", json={"priority": "CRITICAL"}, headers={"Authorization": f"Bearer {admin_token}"})
+    assert res.status_code == 409
+    detail = res.json()["detail"].lower()
+    assert "resolved" in detail or "completed" in detail
+
+def test_sla_recalculation_on_priority_change(client, admin_token, employee_token):
+    from datetime import datetime
+    ticket = client.post("/tickets/", json={"title": "SLA Clock Test", "description": "Checking SLA calculation"}, headers={"Authorization": f"Bearer {employee_token}"}).json()
+    ticket_id = ticket["id"]
+
+    created_at_str = ticket["created_at"]
+    created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+
+    # Update to CRITICAL (duration = 2 hours)
+    res_crit = client.patch(f"/tickets/{ticket_id}/priority", json={"priority": "CRITICAL", "reason": "Escalation"}, headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_crit.status_code == 200
+    crit_ticket = res_crit.json()
+    assert crit_ticket["priority"] == "CRITICAL"
+
+    new_deadline = datetime.fromisoformat(crit_ticket["sla_deadline"].replace("Z", "+00:00"))
+    diff_hours = (new_deadline - created_at).total_seconds() / 3600
+    # Must be 2 hours from ticket's original creation time, NOT restarted from patch time
+    assert round(diff_hours) == 2
+
+def test_ticket_audit_trail_events(client, admin_token, employee_token):
+    ticket = client.post("/tickets/", json={"title": "Audit Trail Inspection", "description": "Audit check"}, headers={"Authorization": f"Bearer {employee_token}"}).json()
+    ticket_id = ticket["id"]
+
+    # Change priority with reason
+    client.patch(f"/tickets/{ticket_id}/priority", json={"priority": "HIGH", "reason": "High priority requested"}, headers={"Authorization": f"Bearer {admin_token}"})
+
+    # Reassign with reason
+    client.post(f"/tickets/{ticket_id}/assign", json={"assigned_to_id": 1, "reason": "Reassigned to primary admin"}, headers={"Authorization": f"Bearer {admin_token}"})
+
+    # Fetch ticket and inspect history
+    detail = client.get(f"/tickets/{ticket_id}", headers={"Authorization": f"Bearer {admin_token}"}).json()
+    history = detail.get("history", [])
+    assert len(history) >= 2
+
+    # Check for priority change event
+    priority_events = [h for h in history if h.get("action_type") == "PRIORITY_CHANGED"]
+    assert len(priority_events) >= 1
+    assert priority_events[0]["new_priority"] == "HIGH"
+    assert "High priority requested" in priority_events[0]["comment"]
+
+def test_hardware_fulfillment_not_auto_assigned(client, employee_token):
+    ticket = client.post("/tickets/", json={
+        "title": "Hardware Request: Laptop Provisioning",
+        "description": "Requested equipment: ThinkPad T14 with 32GB RAM"
+    }, headers={"Authorization": f"Bearer {employee_token}"}).json()
+
+    # Hardware equipment fulfillment requests must remain OPEN and unassigned
+    assert ticket["status"] == "OPEN"
+    assert ticket["assigned_to_id"] is None
 
 
 

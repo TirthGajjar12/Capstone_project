@@ -19,30 +19,44 @@ class TicketCreate(TicketBase):
 # 3. Schema for Assigning a Ticket to IT Support
 class TicketAssign(BaseModel):
     assigned_to_id: int
+    reason: Optional[str] = None
 
-# 4. Schema for Updating Ticket Status
+# 4. Schema for Changing Ticket Priority
+class TicketPriorityUpdate(BaseModel):
+    priority: TicketPriority
+    reason: Optional[str] = None
+
+# 5. Schema for Updating Ticket Status
 class TicketUpdateStatus(BaseModel):
     status: TicketStatus
     comment: Optional[str] = None
 
-# 5. Schema for Resolving a Ticket
+# 6. Schema for Resolving a Ticket
 class TicketResolve(BaseModel):
     resolution_notes: str
     asset_id: Optional[int] = None
 
-# 6. Ticket History Response
+# 7. Ticket History Response
 class TicketHistoryResponse(BaseModel):
     id: int
     ticket_id: Optional[int] = None
-    changed_by_id: int
+    changed_by_id: Optional[int] = None
+    changed_by_name: Optional[str] = None
+    action_type: Optional[str] = None
     previous_status: Optional[str] = None
     new_status: Optional[str] = None
+    previous_priority: Optional[str] = None
+    new_priority: Optional[str] = None
+    previous_assignee_id: Optional[int] = None
+    previous_assignee_name: Optional[str] = None
+    new_assignee_id: Optional[int] = None
+    new_assignee_name: Optional[str] = None
     comment: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
-# 7. Complete Ticket Response (with SLA computed info)
+# 8. Complete Ticket Response (with SLA computed info)
 class TicketResponse(TicketBase):
     id: int
     ticket_number: str
@@ -50,6 +64,7 @@ class TicketResponse(TicketBase):
     category: TicketCategory
     priority: TicketPriority
     status: TicketStatus
+    assignment_mode: Optional[str] = None  # "AUTO", "MANUAL", or None
     created_by_id: int
     created_by: Optional[UserResponse] = None
     created_by_name: Optional[str] = None

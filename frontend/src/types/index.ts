@@ -39,6 +39,7 @@ export interface Ticket {
   category: TicketCategory;
   priority: TicketPriority;
   status: TicketStatus;
+  assignment_mode?: 'AUTO' | 'MANUAL' | null;
   created_by?: number | User;
   created_by_id?: number;
   created_by_name?: string;
@@ -71,12 +72,19 @@ export interface ActivityLog {
 export interface TicketHistory {
   id: number;
   ticket_id?: number;
+  action_type?: string | null;
   previous_status?: string | null;
   old_status?: string | null;
   new_status?: string | null;
-  changed_by_id: number;
-  changed_by?: number;
-  changed_by_name?: string;
+  previous_priority?: string | null;
+  new_priority?: string | null;
+  previous_assignee_id?: number | null;
+  previous_assignee_name?: string | null;
+  new_assignee_id?: number | null;
+  new_assignee_name?: string | null;
+  changed_by_id?: number | null;
+  changed_by?: number | null;
+  changed_by_name?: string | null;
   comment?: string | null;
   created_at: string;
 }
@@ -90,6 +98,7 @@ export interface TicketHistory {
 export type WebSocketEventType =
   | 'TICKET_CREATED'
   | 'TICKET_UPDATED'
+  | 'TICKET_PRIORITY_UPDATED'
   | 'TICKET_STATUS_UPDATED'
   | 'TICKET_ASSIGNED'
   | 'TICKET_RESOLVED'

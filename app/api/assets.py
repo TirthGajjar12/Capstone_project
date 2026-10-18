@@ -138,7 +138,7 @@ def list_assets(
             (Asset.serial_number.ilike(search_pattern)) |
             (User.full_name.ilike(search_pattern)) |
             (User.email.ilike(search_pattern))
-        )
+        ).distinct()
 
     # Set total matching count in header for pagination awareness
     total_count = query.count()

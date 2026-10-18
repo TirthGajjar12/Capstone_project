@@ -158,6 +158,8 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
     if (s === 'AVAILABLE') return <span className="warm-pill warm-pill-available">● AVAILABLE</span>;
     if (s === 'ASSIGNED') return <span className="warm-pill warm-pill-assigned">● ASSIGNED</span>;
     if (s === 'UNDER_REPAIR') return <span className="warm-pill warm-pill-maintenance">● UNDER REPAIR</span>;
+    if (s === 'RETIRED') return <span className="warm-pill warm-pill-closed">● RETIRED</span>;
+    if (s === 'LOST') return <span className="warm-pill warm-pill-maintenance">● LOST</span>;
     return <span className="warm-pill warm-pill-neutral">● {status}</span>;
   };
 
@@ -370,6 +372,8 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
               <option value="AVAILABLE">Available</option>
               <option value="ASSIGNED">Assigned</option>
               <option value="UNDER_REPAIR">Under Repair</option>
+              <option value="RETIRED">Retired</option>
+              <option value="LOST">Lost</option>
             </select>
           </div>
         )}

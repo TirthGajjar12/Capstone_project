@@ -49,3 +49,71 @@ def classify_ticket(text: str) -> Tuple[TicketCategory, TicketPriority]:
         category = TicketCategory.OTHER
 
     return category, priority
+
+
+def is_equipment_fulfillment_request(title: str, description: str, category: TicketCategory) -> bool:
+    """
+    Distinguishes hardware provisioning / fulfillment requests from ordinary repair/support incidents.
+    Equipment fulfillment requests are preserved for inventory allocation rather than ordinary incident triage.
+    """
+    if category != TicketCategory.HARDWARE:
+        return False
+    t_clean = (title or "").lower()
+    d_clean = (description or "").lower()
+    return (
+        t_clean.startswith("hardware request") or
+        "request:" in t_clean or
+        "request equipment" in t_clean or
+        "requested equipment:" in d_clean
+    )
+
+
+def find_least_loaded_support_engineer(db) -> "Optional[User]":
+    """
+    Selects an active IT Support engineer with the lowest active workload:
+    - Only users with role == 'SUPPORT' and is_active == True are eligible.
+    - Admins and inactive users are strictly excluded.
+    - Workload is measured as the count of active tickets in ASSIGNED or IN_PROGRESS status.
+    - RESOLVED and CLOSED tickets are strictly excluded.
+    - Deterministic tie-breaker: lowest User.id among engineers with equal workload.
+    - Returns None if no active SUPPORT user is available.
+    """
+    from sqlalchemy import func
+    from app.models.user import User
+    from app.models.ticket import Ticket, TicketStatus
+
+    # 1. Fetch eligible active SUPPORT engineers
+    support_engineers = (
+        db.query(User)
+        .filter(User.role == "SUPPORT", User.is_active == True)
+        .order_by(User.id.asc())
+        .all()
+    )
+
+    if not support_engineers:
+        return None
+
+    # 2. Query active workloads for all eligible support engineers in a single aggregated query
+    support_ids = [u.id for u in support_engineers]
+    workloads = {u_id: 0 for u_id in support_ids}
+
+    active_counts = (
+        db.query(Ticket.assigned_to_id, func.count(Ticket.id))
+        .filter(
+            Ticket.assigned_to_id.in_(support_ids),
+            Ticket.status.in_([TicketStatus.ASSIGNED, TicketStatus.IN_PROGRESS])
+        )
+        .group_by(Ticket.assigned_to_id)
+        .all()
+    )
+
+    for assigned_id, count in active_counts:
+        workloads[assigned_id] = count
+
+    # 3. Deterministic selection: lowest workload; on tie, lowest user.id
+    try:
+        best_engineer = min(support_engineers, key=lambda eng: (workloads.get(eng.id, 0), getattr(eng, 'id', 0)))
+        return best_engineer
+    except (ValueError, TypeError):
+        return None
+

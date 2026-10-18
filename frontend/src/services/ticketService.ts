@@ -55,8 +55,17 @@ export const ticketService = {
 
 
 
-  async assign(id: number, userId: number) {
-    const response = await api.post(`/tickets/${id}/assign`, { assigned_to_id: userId });
+  async assign(id: number, userId: number, reason?: string): Promise<Ticket> {
+    const payload: { assigned_to_id: number; reason?: string } = { assigned_to_id: userId };
+    if (reason) payload.reason = reason;
+    const response = await api.post<Ticket>(`/tickets/${id}/assign`, payload);
+    return response.data;
+  },
+
+  async updatePriority(id: number, priority: string, reason?: string): Promise<Ticket> {
+    const payload: { priority: string; reason?: string } = { priority };
+    if (reason) payload.reason = reason;
+    const response = await api.patch<Ticket>(`/tickets/${id}/priority`, payload);
     return response.data;
   },
 
