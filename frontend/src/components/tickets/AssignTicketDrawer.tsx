@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, User } from '../../types';
 import { ticketService, userService } from '../../services/ticketService';
+import { IconBox, IconTicket } from '../common/Icons';
 
 interface AssignTicketDrawerProps {
   ticket: Ticket | null;
@@ -124,7 +125,7 @@ export const AssignTicketDrawer: React.FC<AssignTicketDrawerProps> = ({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#3730a3', fontWeight: 700, fontSize: '0.86rem' }}>
-              <span>📦</span>
+              <IconBox size={16} color="#3730a3" />
               <span>Hardware Allocation Request</span>
             </div>
             <p style={{ margin: 0, fontSize: '0.78rem', color: '#4338ca', lineHeight: 1.4 }}>
@@ -146,7 +147,7 @@ export const AssignTicketDrawer: React.FC<AssignTicketDrawerProps> = ({
                   borderColor: '#4338ca',
                 }}
               >
-                📦 Open Hardware Inventory
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><IconBox size={13} /> Open Hardware Inventory</span>
               </button>
             )}
           </div>
@@ -155,7 +156,9 @@ export const AssignTicketDrawer: React.FC<AssignTicketDrawerProps> = ({
         {/* Selected Ticket Summary Card */}
         <div className="drawer-asset-card" style={{ marginBottom: '1.25rem' }}>
           <div className="drawer-asset-badge">
-            <span className="drawer-asset-icon">🎫</span>
+            <span className="drawer-asset-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IconTicket size={18} color="var(--color-accent)" />
+            </span>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                 <span className="drawer-asset-tag">{ticketNumber}</span>

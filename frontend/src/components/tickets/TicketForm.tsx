@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ticketService, assetService } from '../../services/ticketService';
 import { Asset } from '../../types';
+import { IconAlert } from '../common/Icons';
 
 export const TicketForm: React.FC = () => {
   const { user } = useAuth();
@@ -73,7 +74,7 @@ export const TicketForm: React.FC = () => {
       </div>
 
       <div className="modern-form-card">
-        {error && <div className="alert alert-error" style={{ marginBottom: '1.25rem' }}>⚠️ {error}</div>}
+        {error && <div className="alert alert-error" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><IconAlert size={16} /> {error}</div>}
 
         <form onSubmit={handleSubmit}>
           {/* Affected Device Selector */}

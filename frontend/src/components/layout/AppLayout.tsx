@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import RequestAssetModal from '../assets/RequestAssetModal';
+import { Logo2D, IconPlus, IconSparkles, IconBox, IconSun, IconMoon } from '../common/Icons';
 
 /**
  * AppLayout — wraps all authenticated pages with the warm editorial sidebar + top navigation header.
@@ -52,10 +53,10 @@ const AppLayout: React.FC = () => {
     <div className="app-layout">
       {/* ---- Sidebar ---- */}
       <aside className="sidebar">
-        {/* Brand Logo with Peach Badge */}
+        {/* Brand Logo with 2D Minimalist Vector Mark */}
         <div className="sidebar-brand">
-          <div className="sidebar-brand-badge">
-            <span className="brand-badge-letter">IT</span>
+          <div className="sidebar-brand-badge" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Logo2D size={24} color="#6366f1" />
           </div>
           <div className="sidebar-brand-text">
             <h2>IT Asset Manager</h2>
@@ -162,7 +163,7 @@ const AppLayout: React.FC = () => {
                       `sidebar-link${isActive ? ' active' : ''}`
                     }
                   >
-                    <span className="link-icon action-icon">➕</span>
+                    <span className="link-icon action-icon"><IconPlus size={16} /></span>
                     New Ticket
                   </NavLink>
 
@@ -171,7 +172,7 @@ const AppLayout: React.FC = () => {
                     className="sidebar-link sidebar-btn-action"
                     onClick={() => setRequestModalOpen(true)}
                   >
-                    <span className="link-icon action-icon">✨</span>
+                    <span className="link-icon action-icon"><IconSparkles size={16} /></span>
                     Request Equipment
                   </button>
                 </>
@@ -184,7 +185,7 @@ const AppLayout: React.FC = () => {
                     `sidebar-link${isActive ? ' active' : ''}`
                   }
                 >
-                  <span className="link-icon action-icon">📦</span>
+                  <span className="link-icon action-icon"><IconBox size={16} /></span>
                   Add Asset
                 </NavLink>
               )}
@@ -206,7 +207,7 @@ const AppLayout: React.FC = () => {
               title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
               aria-label="Toggle theme"
             >
-              {theme === 'dark' ? '☀️' : '🌙'}
+              {theme === 'dark' ? <IconSun size={15} /> : <IconMoon size={15} />}
             </button>
             <button
               className="sidebar-logout-btn"
@@ -243,7 +244,7 @@ const AppLayout: React.FC = () => {
               title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
               aria-label="Toggle theme"
             >
-              {theme === 'dark' ? '☀️' : '🌙'}
+              {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
             </button>
             <div className="topbar-role-pill">{user?.role ?? 'EMPLOYEE'}</div>
             <div className="topbar-avatar">{initials}</div>

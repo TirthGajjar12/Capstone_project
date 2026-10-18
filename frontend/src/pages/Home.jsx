@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { IconBarChart, IconTicket, IconLaptop, IconPlus } from '../components/common/Icons';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -37,12 +38,12 @@ function HomePage() {
               width: '52px',
               height: '52px',
               borderRadius: '50%',
-              background: '#8b3a04',
+              background: '#6366f1',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '1.35rem',
+              fontSize: '1.25rem',
               fontWeight: 700,
             }}
           >
@@ -65,7 +66,7 @@ function HomePage() {
 
         {/* Functional Navigation Cards Grid */}
         <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '1.5rem 0 1rem 0' }}>
-          Available Workspaces & Services
+          Available Workspaces &amp; Services
         </h3>
 
         <div
@@ -81,7 +82,7 @@ function HomePage() {
             onClick={() => navigate('/dashboard')}
             style={{ padding: '1.25rem' }}
           >
-            <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>📊</div>
+            <div style={{ marginBottom: '0.65rem' }}><IconBarChart size={24} color="#6366f1" /></div>
             <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1.05rem', fontWeight: 700 }}>
               Operational Dashboard
             </h4>
@@ -96,7 +97,7 @@ function HomePage() {
             onClick={() => navigate('/tickets')}
             style={{ padding: '1.25rem' }}
           >
-            <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>🎫</div>
+            <div style={{ marginBottom: '0.65rem' }}><IconTicket size={24} color="#6366f1" /></div>
             <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1.05rem', fontWeight: 700 }}>
               Support Tickets
             </h4>
@@ -111,9 +112,9 @@ function HomePage() {
             onClick={() => navigate('/assets')}
             style={{ padding: '1.25rem' }}
           >
-            <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>💻</div>
+            <div style={{ marginBottom: '0.65rem' }}><IconLaptop size={24} color="#6366f1" /></div>
             <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1.05rem', fontWeight: 700 }}>
-              Hardware & Inventory
+              Hardware &amp; Inventory
             </h4>
             <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--color-text-secondary)', lineHeight: 1.45 }}>
               Explore the company device catalog, hardware specifications, and assignments.
@@ -126,7 +127,7 @@ function HomePage() {
             onClick={() => navigate('/tickets/create')}
             style={{ padding: '1.25rem' }}
           >
-            <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>➕</div>
+            <div style={{ marginBottom: '0.65rem' }}><IconPlus size={24} color="#6366f1" /></div>
             <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1.05rem', fontWeight: 700 }}>
               Submit New Ticket
             </h4>

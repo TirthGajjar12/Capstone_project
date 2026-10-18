@@ -367,4 +367,52 @@ def test_rsa_key_persistence(client):
     assert os.path.exists(os.path.join(root_dir, "keys", "rsa_private.pem"))
 
 
+# ==================== 8. ASSET FILTERING TESTS ====================
+
+def test_assets_filter_case_insensitive_type(client, admin_token):
+    # Query with uppercase "LAPTOP" (which previously returned 422)
+    res_upper = client.get("/assets/?asset_type=LAPTOP", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_upper.status_code == 200
+    for asset in res_upper.json():
+        assert asset["asset_type"] == "Laptop"
+
+    # Query with title case "Laptop"
+    res_title = client.get("/assets/?asset_type=Laptop", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_title.status_code == 200
+    for asset in res_title.json():
+        assert asset["asset_type"] == "Laptop"
+
+    # Query with lowercase "laptop"
+    res_lower = client.get("/assets/?asset_type=laptop", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_lower.status_code == 200
+    for asset in res_lower.json():
+        assert asset["asset_type"] == "Laptop"
+
+def test_assets_filter_peripherals_grouping(client, admin_token):
+    # Query with "PERIPHERALS" bundle
+    res_peri = client.get("/assets/?asset_type=PERIPHERALS", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_peri.status_code == 200
+    peri_types = {"Keyboard", "Mouse", "Printer"}
+    for asset in res_peri.json():
+        assert asset["asset_type"] in peri_types
+
+    # Query with comma-separated types
+    res_comma = client.get("/assets/?asset_type=Keyboard,Mouse,Printer", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_comma.status_code == 200
+    for asset in res_comma.json():
+        assert asset["asset_type"] in peri_types
+
+def test_assets_filter_employee_view(client, employee_token):
+    # Employee fetches their own assets with type filter
+    res = client.get("/assets/?asset_type=LAPTOP", headers={"Authorization": f"Bearer {employee_token}"})
+    assert res.status_code == 200
+    for asset in res.json():
+        assert asset["asset_type"] == "Laptop"
+
+def test_assets_search_by_employee_name(client, admin_token):
+    res = client.get("/assets/?search=John", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res.status_code == 200
+
+
+
 

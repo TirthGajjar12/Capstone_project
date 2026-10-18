@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Asset, User } from '../../types';
+import { IconLaptop, IconUser } from '../common/Icons';
 import { assetService, userService } from '../../services/ticketService';
 
 interface AssignAssetDrawerProps {
@@ -84,7 +85,9 @@ export const AssignAssetDrawer: React.FC<AssignAssetDrawerProps> = ({
         {/* Selected Asset Summary Card */}
         <div className="drawer-asset-card">
           <div className="drawer-asset-badge">
-            <span className="drawer-asset-icon">💻</span>
+            <span className="drawer-asset-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IconLaptop size={18} color="var(--color-accent)" />
+            </span>
             <div>
               <div className="drawer-asset-tag">{tag}</div>
               <div className="drawer-asset-name">
@@ -131,9 +134,9 @@ export const AssignAssetDrawer: React.FC<AssignAssetDrawerProps> = ({
         {/* Employee Results List */}
         <div className="drawer-user-list">
           {users.length === 0 && !loading ? (
-            <div className="drawer-empty-state">
-              <span>👤</span>
-              <p>No active employees found matching "{search}"</p>
+            <div className="drawer-empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <IconUser size={28} color="var(--color-text-secondary)" />
+              <p style={{ marginTop: '0.4rem' }}>No active employees found matching "{search}"</p>
             </div>
           ) : (
             users.map((u) => {

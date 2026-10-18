@@ -6,6 +6,7 @@ import { ticketService, assetService } from '../../services/ticketService';
 import { Ticket, Asset } from '../../types';
 import RequestAssetModal from '../assets/RequestAssetModal';
 import useWebSocket from '../../hooks/useWebSocket';
+import { IconTicket, IconCheckCircle, IconLaptop, IconFolder, IconGlobe, IconKey, IconGear, IconBox, IconSparkles, IconPlus, IconUser, IconUsers, IconArrowRight } from '../common/Icons';
 
 interface SlaData {
   total_tickets: number;
@@ -176,10 +177,10 @@ export const Dashboard: React.FC = () => {
                 className="btn-warm-secondary"
                 onClick={() => setRequestModalOpen(true)}
               >
-                <span>✨ Request Equipment</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconSparkles size={14} /> Request Equipment</span>
               </button>
               <Link to="/tickets/create" className="btn-warm-terracotta">
-                <span>+ New Ticket</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconPlus size={14} /> New Ticket</span>
               </Link>
             </>
           )}
@@ -188,10 +189,10 @@ export const Dashboard: React.FC = () => {
           {user?.role === 'SUPPORT' && (
             <>
               <Link to="/tickets" className="btn-warm-secondary">
-                <span>🎫 View Ticket Queue</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconTicket size={14} /> View Ticket Queue</span>
               </Link>
               <Link to="/inventory/available" className="btn-warm-terracotta">
-                <span>👤+ Assign Hardware</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconBox size={14} /> Assign Hardware</span>
               </Link>
             </>
           )}
@@ -200,10 +201,10 @@ export const Dashboard: React.FC = () => {
           {isAdmin && (
             <>
               <Link to="/tickets/assign" className="btn-warm-secondary">
-                <span>👥 Assign Tickets</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconUsers size={14} /> Assign Tickets</span>
               </Link>
               <Link to="/assets/create" className="btn-warm-terracotta">
-                <span>+ Add Asset</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconPlus size={14} /> Add Asset</span>
               </Link>
             </>
           )}
@@ -248,7 +249,9 @@ export const Dashboard: React.FC = () => {
         <div className="dash-metric-card" onClick={() => navigate('/tickets')} style={{ cursor: 'pointer' }}>
           <div className="metric-header">
             <span className="metric-label">OPEN TICKETS</span>
-            <div className="metric-icon-box">🎫</div>
+            <div className="metric-icon-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IconTicket size={15} color="var(--color-accent)" />
+            </div>
           </div>
           <div className="metric-body">
             <span className="metric-value">{openCount}</span>
@@ -260,7 +263,9 @@ export const Dashboard: React.FC = () => {
         <div className="dash-metric-card" onClick={() => navigate('/tickets')} style={{ cursor: 'pointer' }}>
           <div className="metric-header">
             <span className="metric-label">IN PROGRESS</span>
-            <div className="metric-icon-box">⚡</div>
+            <div className="metric-icon-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IconSparkles size={15} color="#f59e0b" />
+            </div>
           </div>
           <div className="metric-body">
             <span className="metric-value">{inProgressCount + assignedCount}</span>
@@ -272,7 +277,9 @@ export const Dashboard: React.FC = () => {
         <div className="dash-metric-card" onClick={() => navigate('/tickets')} style={{ cursor: 'pointer' }}>
           <div className="metric-header">
             <span className="metric-label">RESOLVED</span>
-            <div className="metric-icon-box">✅</div>
+            <div className="metric-icon-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IconCheckCircle size={15} color="#10b981" />
+            </div>
           </div>
           <div className="metric-body">
             <span className="metric-value resolved-number">{resolvedCount}</span>
@@ -286,7 +293,9 @@ export const Dashboard: React.FC = () => {
         <div className="dash-metric-card" onClick={() => navigate('/assets')} style={{ cursor: 'pointer' }}>
           <div className="metric-header">
             <span className="metric-label">HARDWARE</span>
-            <div className="metric-icon-box">💻</div>
+            <div className="metric-icon-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IconLaptop size={15} color="var(--color-text-secondary)" />
+            </div>
           </div>
           <div className="metric-body">
             <span className="metric-value">
@@ -308,8 +317,8 @@ export const Dashboard: React.FC = () => {
         <div className="dash-left-column">
           <div className="warm-card">
             <div className="warm-card-header">
-              <div className="warm-card-title-group">
-                <span className="warm-card-icon">🗂️</span>
+              <div className="warm-card-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <IconFolder size={18} color="var(--color-accent)" />
                 <h2 className="warm-card-title">Recent Support Tickets</h2>
               </div>
               <Link to="/tickets" className="warm-view-all-link">
@@ -321,9 +330,9 @@ export const Dashboard: React.FC = () => {
               {loadingData ? (
                 <div className="dash-loading-state">Loading support tickets…</div>
               ) : recentTickets.length === 0 ? (
-                <div className="dash-empty-tickets">
-                  <span>🎫</span>
-                  <p>No recent tickets found. All systems operational.</p>
+                <div className="dash-empty-tickets" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <IconTicket size={30} color="var(--color-text-secondary)" />
+                  <p style={{ marginTop: '0.5rem' }}>No recent tickets found. All systems operational.</p>
                 </div>
               ) : (
                 recentTickets.map((t) => {
@@ -338,8 +347,16 @@ export const Dashboard: React.FC = () => {
                       onClick={() => navigate('/tickets')}
                     >
                       <div className="ticket-row-left">
-                        <div className="ticket-type-icon">
-                          {t.category === 'Hardware' ? '💻' : t.category === 'Network' ? '🌐' : t.category === 'Access' ? '🔑' : '⚙️'}
+                        <div className="ticket-type-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {t.category === 'Hardware' ? (
+                            <IconLaptop size={14} />
+                          ) : t.category === 'Network' ? (
+                            <IconGlobe size={14} />
+                          ) : t.category === 'Access' ? (
+                            <IconKey size={14} />
+                          ) : (
+                            <IconGear size={14} />
+                          )}
                         </div>
                         <div className="ticket-info">
                           <div className="ticket-title-line">
@@ -348,7 +365,7 @@ export const Dashboard: React.FC = () => {
                             <span className="ticket-subject">{t.title}</span>
                           </div>
                           <div className="ticket-submeta">
-                            <span>📅 {createdDate}</span>
+                            <span>{createdDate}</span>
                             <span className="meta-dot">•</span>
                             <span>{t.category}</span>
                             <span className="meta-dot">•</span>
@@ -371,7 +388,9 @@ export const Dashboard: React.FC = () => {
             assignedHardware ? (
               <div className="equipment-card" onClick={() => navigate('/assets')}>
                 <div className="equipment-card-left">
-                  <div className="equipment-icon-box">💻</div>
+                  <div className="equipment-icon-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <IconLaptop size={18} color="var(--color-accent)" />
+                  </div>
                   <div className="equipment-info">
                     <div className="equipment-title">
                       {assignedHardware.brand} {assignedHardware.model}
@@ -389,7 +408,9 @@ export const Dashboard: React.FC = () => {
             ) : (
               <div className="equipment-card request-nudge" onClick={() => setRequestModalOpen(true)}>
                 <div className="equipment-card-left">
-                  <div className="equipment-icon-box">📦</div>
+                  <div className="equipment-icon-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <IconBox size={18} color="var(--color-accent)" />
+                  </div>
                   <div className="equipment-info">
                     <div className="equipment-title">No Device Assigned</div>
                     <div className="equipment-meta">Need a company laptop or peripheral? Click to submit an equipment request.</div>
@@ -406,7 +427,9 @@ export const Dashboard: React.FC = () => {
             /* Staff Spotlight Card (Support & Admin do NOT see 'Request Equipment') */
             <div className="equipment-card" onClick={() => navigate('/inventory/available')} style={{ cursor: 'pointer' }}>
               <div className="equipment-card-left">
-                <div className="equipment-icon-box">📦</div>
+                <div className="equipment-icon-box" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconBox size={18} color="var(--color-accent)" />
+                </div>
                 <div className="equipment-info">
                   <div className="equipment-title">Available Inventory Pool ({stockCount} Devices Ready)</div>
                   <div className="equipment-meta">
@@ -429,15 +452,15 @@ export const Dashboard: React.FC = () => {
           {isEmployee && (
             <div className="warm-card" style={{ padding: '1.25rem' }}>
               <div className="warm-card-header" style={{ marginBottom: '0.85rem' }}>
-                <div className="warm-card-title-group">
-                  <span className="warm-card-icon">💡</span>
+                <div className="warm-card-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <IconSparkles size={16} color="var(--color-accent)" />
                   <h2 className="warm-card-title">Employee Support Hub</h2>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 <div style={{ background: 'var(--color-bg-secondary, #fafaf9)', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e7ded4' }}>
                   <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--color-text-primary)', marginBottom: '0.2rem' }}>
-                    ⚡ Intelligent Triage
+                    Intelligent Triage
                   </div>
                   <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.76rem', lineHeight: 1.4 }}>
                     Submit requests describing your issue. Automated NLP triage assigns appropriate priority and routes urgent requests for expedited attention.
@@ -445,7 +468,7 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <div style={{ background: 'var(--color-bg-secondary, #fafaf9)', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e7ded4' }}>
                   <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--color-text-primary)', marginBottom: '0.2rem' }}>
-                    📦 Equipment Requests
+                    Equipment Requests
                   </div>
                   <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.76rem', lineHeight: 1.4 }}>
                     Need a replacement laptop, external monitor, or peripherals? Use "Request Equipment" to submit a hardware allocation request.
@@ -582,25 +605,25 @@ export const Dashboard: React.FC = () => {
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/tickets/create')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>➕ Submit Support Ticket</span>
+                    <IconPlus size={14} /> <span>Submit Support Ticket</span>
                   </button>
                   <button
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => setRequestModalOpen(true)}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>✨ Request Equipment</span>
+                    <IconSparkles size={14} /> <span>Request Equipment</span>
                   </button>
                   <button
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/assets')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>💻 View My Devices</span>
+                    <IconLaptop size={14} /> <span>View My Devices</span>
                   </button>
                 </>
               )}
@@ -612,25 +635,25 @@ export const Dashboard: React.FC = () => {
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/tickets')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>🎫 Triage Support Ticket Queue</span>
+                    <IconTicket size={14} /> <span>Triage Support Ticket Queue</span>
                   </button>
                   <button
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/inventory/available')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>👤+ Assign Available Hardware</span>
+                    <IconBox size={14} /> <span>Assign Available Hardware</span>
                   </button>
                   <button
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/assets')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>💻 Browse Asset Directory</span>
+                    <IconLaptop size={14} /> <span>Browse Asset Directory</span>
                   </button>
                 </>
               )}
@@ -642,41 +665,41 @@ export const Dashboard: React.FC = () => {
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/assets/create')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>📦 Add New Asset to Catalog</span>
+                    <IconBox size={14} /> <span>Add New Asset to Catalog</span>
                   </button>
                   <button
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/tickets/assign')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>👥 Dispatch & Assign Tickets</span>
+                    <IconUsers size={14} /> <span>Dispatch &amp; Assign Tickets</span>
                   </button>
                   <button
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/inventory/available')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>👤+ Assign Available Hardware</span>
+                    <IconBox size={14} /> <span>Assign Available Hardware</span>
                   </button>
                   <button
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/assets')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>💻 Manage Asset Catalog</span>
+                    <IconLaptop size={14} /> <span>Manage Asset Catalog</span>
                   </button>
                   <button
                     type="button"
                     className="btn-warm-secondary"
                     onClick={() => navigate('/tickets')}
-                    style={{ justifyContent: 'flex-start' }}
+                    style={{ justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    <span>🎫 Review All Tickets</span>
+                    <IconTicket size={14} /> <span>Review All Tickets</span>
                   </button>
                 </>
               )}

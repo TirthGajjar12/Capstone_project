@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { assetService } from '../../services/ticketService';
 import { useAuth } from '../../context/AuthContext';
+import { IconAlert } from '../common/Icons';
 
 export const AssetForm: React.FC = () => {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ export const AssetForm: React.FC = () => {
       </div>
 
       <div className="modern-form-card">
-        {error && <div className="alert alert-error" style={{ marginBottom: '1.25rem' }}>⚠️ {error}</div>}
+        {error && <div className="alert alert-error" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><IconAlert size={16} /> {error}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="form-grid-2">

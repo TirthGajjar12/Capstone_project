@@ -64,12 +64,38 @@ async def create_asset(
     return new_asset
 
 
+# Case-insensitive lookup dictionaries for query parameters
+ASSET_TYPE_LOOKUP = {
+    "laptop": [AssetType.LAPTOP],
+    "laptops": [AssetType.LAPTOP],
+    "monitor": [AssetType.MONITOR],
+    "monitors": [AssetType.MONITOR],
+    "keyboard": [AssetType.KEYBOARD],
+    "keyboards": [AssetType.KEYBOARD],
+    "mouse": [AssetType.MOUSE],
+    "mice": [AssetType.MOUSE],
+    "printer": [AssetType.PRINTER],
+    "printers": [AssetType.PRINTER],
+    "peripheral": [AssetType.KEYBOARD, AssetType.MOUSE, AssetType.PRINTER],
+    "peripherals": [AssetType.KEYBOARD, AssetType.MOUSE, AssetType.PRINTER],
+}
+for _et in AssetType:
+    ASSET_TYPE_LOOKUP[_et.value.lower()] = [_et]
+    ASSET_TYPE_LOOKUP[_et.name.lower()] = [_et]
+
+ASSET_STATUS_LOOKUP = {
+    _st.value.lower(): _st for _st in AssetStatus
+}
+for _st in AssetStatus:
+    ASSET_STATUS_LOOKUP[_st.name.lower()] = _st
+
+
 @router.get("", response_model=List[AssetResponse], include_in_schema=False)
 @router.get("/", response_model=List[AssetResponse])
 def list_assets(
     response: Response,
-    asset_type: Optional[AssetType] = None,
-    asset_status: Optional[AssetStatus] = None,
+    asset_type: Optional[str] = Query(None, description="Asset type (e.g. Laptop, Monitor, Peripherals, Keyboard)"),
+    asset_status: Optional[str] = Query(None, description="Asset status (e.g. AVAILABLE, ASSIGNED, UNDER_REPAIR)"),
     search: Optional[str] = None,
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: Optional[int] = Query(None, ge=1, le=1000, description="Max number of records to return"),
@@ -80,27 +106,38 @@ def list_assets(
     List assets with optional filtering and pagination:
     - Employees: can ONLY view assets assigned to their account.
     - Admin & Support: can view all company assets in inventory.
-    - Supports skip and limit for server-side pagination.
+    - Supports case-insensitive type, status, employee name search, and skip/limit pagination.
     """
     query = db.query(Asset)
 
     if current_user.role == "EMPLOYEE":
         # Normal employees only see hardware assigned to them
         query = query.filter(Asset.assigned_to_id == current_user.id)
-    else:
-        # Admin / Support filters
-        if asset_type:
-            query = query.filter(Asset.asset_type == asset_type)
-        if asset_status:
-            query = query.filter(Asset.status == asset_status)
+
+    # Filtering applies across all roles (Admin, Support, and Employee)
+    if asset_type and asset_type.strip():
+        matched_types = set()
+        for part in asset_type.split(","):
+            cleaned = part.strip().lower()
+            if cleaned in ASSET_TYPE_LOOKUP:
+                matched_types.update(ASSET_TYPE_LOOKUP[cleaned])
+        if matched_types:
+            query = query.filter(Asset.asset_type.in_(list(matched_types)))
+
+    if asset_status and asset_status.strip():
+        status_key = asset_status.strip().lower()
+        if status_key in ASSET_STATUS_LOOKUP:
+            query = query.filter(Asset.status == ASSET_STATUS_LOOKUP[status_key])
 
     if search and search.strip():
         search_pattern = f"%{search.strip()}%"
-        query = query.filter(
+        query = query.outerjoin(User, Asset.assigned_to_id == User.id).filter(
             (Asset.asset_tag.ilike(search_pattern)) |
             (Asset.brand.ilike(search_pattern)) |
             (Asset.model.ilike(search_pattern)) |
-            (Asset.serial_number.ilike(search_pattern))
+            (Asset.serial_number.ilike(search_pattern)) |
+            (User.full_name.ilike(search_pattern)) |
+            (User.email.ilike(search_pattern))
         )
 
     # Set total matching count in header for pagination awareness

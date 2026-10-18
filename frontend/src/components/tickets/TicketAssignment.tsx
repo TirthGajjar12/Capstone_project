@@ -6,6 +6,7 @@ import { Ticket } from '../../types';
 import AssignTicketDrawer from './AssignTicketDrawer';
 import FulfillRequestDrawer from './FulfillRequestDrawer';
 import useWebSocket from '../../hooks/useWebSocket';
+import { IconBox, IconLaptop, IconUser } from '../common/Icons';
 
 export const TicketAssignment: React.FC = () => {
   const { user } = useAuth();
@@ -418,9 +419,12 @@ export const TicketAssignment: React.FC = () => {
                               borderRadius: '4px',
                               flexShrink: 0,
                               fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
                             }}
                           >
-                            💻 {ticket.asset.asset_tag || `AST-${ticket.asset.id}`}
+                            <IconLaptop size={11} /> {ticket.asset.asset_tag || `AST-${ticket.asset.id}`}
                           </span>
                         )}
                       </div>
@@ -501,7 +505,7 @@ export const TicketAssignment: React.FC = () => {
                             fontWeight: 600,
                           }}
                         >
-                          📦 Fulfill Hardware
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><IconBox size={13} /> Fulfill Hardware</span>
                         </button>
                       ) : (
                         <button
@@ -511,7 +515,7 @@ export const TicketAssignment: React.FC = () => {
                           title="Assign or reassign support engineer"
                           style={{ padding: '0.22rem 0.55rem', fontSize: '0.76rem' }}
                         >
-                          {isAssigned ? '🔄 Reassign' : '👤 Assign'}
+                          {isAssigned ? 'Reassign' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><IconUser size={13} /> Assign</span>}
                         </button>
                       )}
                     </td>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { assetService } from '../../services/ticketService';
+import { IconCheckCircle } from '../common/Icons';
 
 interface RequestAssetModalProps {
   isOpen: boolean;
@@ -78,7 +79,9 @@ export const RequestAssetModal: React.FC<RequestAssetModalProps> = ({
 
         {successTicket ? (
           <div className="request-success-panel">
-            <div className="request-success-icon">✅</div>
+            <div className="request-success-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+              <IconCheckCircle size={40} color="#10b981" />
+            </div>
             <h3>Request Submitted</h3>
             <p>
               Your equipment request has been logged under support ticket <strong>{successTicket}</strong>. The IT support team will review available inventory and allocate your hardware.

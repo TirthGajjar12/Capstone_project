@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import useWebSocket from '../../hooks/useWebSocket';
 import FulfillRequestDrawer from './FulfillRequestDrawer';
 import TicketDetailDrawer from './TicketDetailDrawer';
+import { IconBox, IconLaptop, IconTicket, IconSearch, IconPlus, IconAlert } from '../common/Icons';
 
 export const TicketList = () => {
   const { user } = useAuth();
@@ -232,7 +233,7 @@ export const TicketList = () => {
         <div className="inventory-hero-actions">
           {isEmployee && (
             <Link to="/tickets/create" className="btn-warm-terracotta">
-              <span>+ New Ticket</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconPlus size={15} /> New Ticket</span>
             </Link>
           )}
         </div>
@@ -280,7 +281,7 @@ export const TicketList = () => {
       {/* Filter and Search Bar */}
       <div className="inventory-toolbar">
         <form onSubmit={handleSearch} className="inventory-search-wrap" style={{ flex: 1 }}>
-          <span className="inventory-search-icon">🔍</span>
+          <span className="inventory-search-icon"><IconSearch size={15} /></span>
           <input
             type="text"
             placeholder={isEmployee ? 'Search your tickets by keyword...' : 'Search tickets by number, keyword, employee...'}
@@ -327,7 +328,9 @@ export const TicketList = () => {
           </div>
         ) : error ? (
           <div className="dash-empty-tickets" style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '2.5rem' }}>⚠️</span>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
+              <IconAlert size={34} color="#dc2626" />
+            </div>
             <h3 style={{ margin: '0.75rem 0 0.25rem 0', color: '#dc2626' }}>Failed to Load Tickets</h3>
             <p style={{ color: 'var(--color-text-secondary)', margin: '0 0 1.25rem 0', fontSize: '0.88rem' }}>
               {error}
@@ -338,19 +341,21 @@ export const TicketList = () => {
               onClick={fetchTickets}
               style={{ margin: '0 auto', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
             >
-              🔄 Retry Connection
+              Retry Connection
             </button>
           </div>
         ) : paginatedTickets.length === 0 ? (
           <div className="dash-empty-tickets" style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
-            <span style={{ fontSize: '2.5rem' }}>🎫</span>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem', opacity: 0.6 }}>
+              <IconTicket size={34} color="var(--color-text-secondary)" />
+            </div>
             <h3 style={{ margin: '0.75rem 0 0.25rem 0' }}>No Tickets Found</h3>
             <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: '0.88rem' }}>
               No support requests match your current search or status filter.
             </p>
           </div>
         ) : (
-          <table className="inventory-table">
+          <table className="inventory-table ticket-table">
             <thead>
               <tr>
                 <th style={{ width: '85px' }}>TICKET ID</th>
@@ -428,9 +433,12 @@ export const TicketList = () => {
                               borderRadius: '4px',
                               flexShrink: 0,
                               fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
                             }}
                           >
-                            💻 {ticket.asset.asset_tag || `AST-${ticket.asset.id}`}
+                            <IconLaptop size={11} /> {ticket.asset.asset_tag || `AST-${ticket.asset.id}`}
                           </span>
                         )}
                         {ticket.status === 'RESOLVED' && (
@@ -455,16 +463,19 @@ export const TicketList = () => {
                         <div
                           onClick={() => handleOpenDetail(ticket)}
                           style={{
-                            marginTop: '0.35rem',
+                            marginTop: '0.55rem',
                             fontSize: '0.74rem',
                             background: ticket.status === 'RESOLVED' ? '#ecfdf5' : '#f5f5f4',
                             color: ticket.status === 'RESOLVED' ? '#047857' : '#57534e',
                             borderLeft: `3px solid ${ticket.status === 'RESOLVED' ? '#10b981' : '#a8a29e'}`,
-                            padding: '0.2rem 0.5rem',
+                            padding: '0.25rem 0.55rem',
                             borderRadius: '0 4px 4px 0',
-                            lineHeight: 1.35,
+                            lineHeight: 1.4,
                             cursor: 'pointer',
                             display: 'block',
+                            whiteSpace: 'normal',
+                            wordBreak: 'break-word',
+                            maxWidth: '460px',
                           }}
                           title="Click to inspect resolution audit and full details"
                         >
@@ -557,10 +568,10 @@ export const TicketList = () => {
                                 className="action-btn-sm action-btn-assign-asset"
                                 onClick={() => handleOpenFulfill(ticket)}
                                 disabled={actionLoadingId === ticket.id}
-                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.74rem' }}
+                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                                 title="Assign an available hardware asset to fulfill this request"
                               >
-                                📦 Fulfill Hardware
+                                <IconBox size={12} /> Fulfill Hardware
                               </button>
                             )}
 

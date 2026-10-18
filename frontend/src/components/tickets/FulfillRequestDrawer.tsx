@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, Asset } from '../../types';
 import { ticketService, assetService } from '../../services/ticketService';
+import { IconBox, IconLaptop, IconMonitor, IconTicket, IconUser } from '../common/Icons';
 
 interface FulfillRequestDrawerProps {
   ticket: Ticket | null;
@@ -194,11 +195,11 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
           style={{ background: 'var(--color-bg-secondary, #fafaf9)', border: '1px solid #e7ded4', padding: '0.85rem 1rem', marginBottom: '1rem' }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#6366f1' }}>
-              🎫 {ticket.ticket_number || `INC-${ticket.id}`}
+            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+              <IconTicket size={14} /> {ticket.ticket_number || `INC-${ticket.id}`}
             </span>
-            <span style={{ fontSize: '0.74rem', background: '#e0e7ff', color: '#4338ca', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
-              👤 For: {requesterName}
+            <span style={{ fontSize: '0.74rem', background: '#e0e7ff', color: '#4338ca', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+              <IconUser size={12} /> For: {requesterName}
             </span>
           </div>
           <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>
@@ -272,7 +273,9 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
             </div>
           ) : filteredAssets.length === 0 ? (
             <div className="drawer-empty-state" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
-              <span style={{ fontSize: '2rem' }}>📦</span>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.4rem', opacity: 0.6 }}>
+                <IconBox size={32} color="var(--color-text-secondary)" />
+              </div>
               <p style={{ margin: '0.5rem 0 0.5rem 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
                 No available assets found {categoryFilter !== 'ALL' ? `in category "${categoryFilter}"` : 'in inventory'}.
               </p>
@@ -313,17 +316,15 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                    <span style={{ fontSize: '1.25rem' }}>
-                      {asset.asset_type?.toUpperCase().includes('LAPTOP')
-                        ? '💻'
-                        : asset.asset_type?.toUpperCase().includes('MONITOR')
-                        ? '🖥️'
-                        : asset.asset_type?.toUpperCase().includes('MOUSE')
-                        ? '🖱️'
-                        : asset.asset_type?.toUpperCase().includes('KEYBOARD')
-                        ? '⌨️'
-                        : '📦'}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px' }}>
+                      {asset.asset_type?.toUpperCase().includes('LAPTOP') ? (
+                        <IconLaptop size={16} color="var(--color-accent)" />
+                      ) : asset.asset_type?.toUpperCase().includes('MONITOR') ? (
+                        <IconMonitor size={16} color="var(--color-accent)" />
+                      ) : (
+                        <IconBox size={16} color="var(--color-accent)" />
+                      )}
+                    </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <span style={{ fontWeight: 700, fontSize: '0.84rem' }}>
@@ -422,7 +423,7 @@ export const FulfillRequestDrawer: React.FC<FulfillRequestDrawerProps> = ({
                 borderColor: selectedAsset ? '#4338ca' : undefined,
               }}
             >
-              {submitting ? 'Assigning…' : '📦 Assign & Resolve'}
+              {submitting ? 'Assigning…' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><IconBox size={13} /> Assign &amp; Resolve</span>}
             </button>
           </div>
         </div>

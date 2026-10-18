@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import AssignAssetDrawer from './AssignAssetDrawer';
 import RequestAssetModal from './RequestAssetModal';
 import useWebSocket from '../../hooks/useWebSocket';
+import { IconBox, IconLaptop, IconUser, IconWrench, IconDownload, IconPlus, IconSparkles, IconSearch, IconArrowRight, IconAlert } from '../common/Icons';
 
 interface AssetListProps {
   availableOnly?: boolean;
@@ -63,9 +64,9 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
       const skip = (currentPage - 1) * itemsPerPage;
       const statusParam = isAvailablePage ? 'AVAILABLE' : (statusFilter || undefined);
       let typeParam: string | undefined = undefined;
-      if (typeFilter === 'LAPTOPS') typeParam = 'LAPTOP';
-      else if (typeFilter === 'MONITORS') typeParam = 'MONITOR';
-      else if (typeFilter === 'PERIPHERALS') typeParam = 'KEYBOARD';
+      if (typeFilter === 'LAPTOPS') typeParam = 'Laptop';
+      else if (typeFilter === 'MONITORS') typeParam = 'Monitor';
+      else if (typeFilter === 'PERIPHERALS') typeParam = 'Keyboard,Mouse,Printer';
 
       const res = await assetService.getPaginated(
         statusParam,
@@ -128,6 +129,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
   const activeCount = summaryCounts.active;
   const stockCount = summaryCounts.stock;
   const repairCount = summaryCounts.repair;
+  const hasActiveFilter = Boolean(search.trim() || (typeFilter && typeFilter !== 'ALL') || (statusFilter && (!isAvailablePage || statusFilter !== 'AVAILABLE')));
 
   const exportCSV = async () => {
     const all = await assetService.getAll();
@@ -181,9 +183,11 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
           </h1>
           <p className="inventory-subtitle">
             {isEmployee
-              ? assets.length === 0
+              ? hasActiveFilter
+                ? `Showing ${totalItems} matching assigned device${totalItems === 1 ? '' : 's'}.`
+                : assets.length === 0
                 ? 'No hardware currently allocated to your account. Submit an equipment request below if you need devices.'
-                : `You currently have ${assets.length} device${assets.length > 1 ? 's' : ''} assigned for daily company work.`
+                : `You currently have ${totalItems} device${totalItems === 1 ? '' : 's'} assigned for daily company work.`
               : isAvailablePage
               ? `${stockCount} available devices in reserve. Click 'Assign' to immediately allocate hardware to an employee.`
               : `${totalCount} registered company devices across active assignments and reserve inventory.`}
@@ -194,14 +198,14 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
           {/* CSV Export for Staff */}
           {isStaff && (
             <button type="button" className="btn-warm-secondary" onClick={exportCSV}>
-              <span className="btn-icon">📥</span> Export CSV
+              <span className="btn-icon"><IconDownload size={15} /></span> Export CSV
             </button>
           )}
 
           {/* Add Asset is strictly ADMIN only */}
           {isAdmin && (
             <Link to="/assets/create" className="btn-warm-terracotta">
-              <span>+ Add Asset</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconPlus size={15} /> Add Asset</span>
             </Link>
           )}
 
@@ -212,7 +216,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
               className="btn-warm-terracotta"
               onClick={() => setRequestModalOpen(true)}
             >
-              <span>✨ Request Equipment</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconSparkles size={15} /> Request Equipment</span>
             </button>
           )}
         </div>
@@ -228,7 +232,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
           >
             <div className="fleet-card-header">
               <span className="fleet-card-label">TOTAL ASSETS</span>
-              <span className="fleet-card-icon">💻</span>
+              <IconLaptop size={18} color="var(--color-text-secondary)" />
             </div>
             <div className="fleet-card-body">
               <span className="fleet-number">{totalCount}</span>
@@ -246,7 +250,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
           >
             <div className="fleet-card-header">
               <span className="fleet-card-label">AVAILABLE</span>
-              <span className="fleet-card-icon">📦</span>
+              <IconBox size={18} color="#10b981" />
             </div>
             <div className="fleet-card-body">
               <span className="fleet-number" style={{ color: '#10b981' }}>{stockCount}</span>
@@ -264,7 +268,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
           >
             <div className="fleet-card-header">
               <span className="fleet-card-label">ASSIGNED</span>
-              <span className="fleet-card-icon">👤</span>
+              <IconUser size={18} color="#6366f1" />
             </div>
             <div className="fleet-card-body">
               <span className="fleet-number" style={{ color: '#6366f1' }}>{activeCount}</span>
@@ -282,7 +286,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
           >
             <div className="fleet-card-header">
               <span className="fleet-card-label">UNDER REPAIR</span>
-              <span className="fleet-card-icon">🛠️</span>
+              <IconWrench size={18} color="#f59e0b" />
             </div>
             <div className="fleet-card-body">
               <span className="fleet-number" style={{ color: '#f59e0b' }}>{repairCount}</span>
@@ -299,7 +303,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
       {isStaff && isAvailablePage && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-secondary)', padding: '0.85rem 1.25rem', borderRadius: '10px', marginBottom: '1.25rem', border: '1px solid var(--color-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '1.25rem' }}>👉</span>
+            <IconArrowRight size={16} color="var(--color-accent)" />
             <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>
               Hardware Assignment Mode: Select any device below to allocate it to an employee.
             </span>
@@ -313,7 +317,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
       {/* ==================== 3. SEARCH & TYPE FILTER TOOLBAR ==================== */}
       <div className="inventory-toolbar">
         <div className="inventory-search-wrap" style={{ flex: 1 }}>
-          <span className="inventory-search-icon">🔍</span>
+          <span className="inventory-search-icon"><IconSearch size={15} /></span>
           <input
             type="text"
             placeholder={isEmployee ? 'Search your assigned devices...' : 'Search by tag, brand, model, serial, or employee...'}
@@ -380,12 +384,18 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
           </div>
         ) : paginatedAssets.length === 0 ? (
           <div className="inventory-empty-state" style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
-            <span className="empty-icon" style={{ fontSize: '2.5rem' }}>📦</span>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem', opacity: 0.6 }}>
+              <IconBox size={38} color="var(--color-text-secondary)" />
+            </div>
             <h3 style={{ margin: '0.75rem 0 0.35rem 0' }}>
-              {isEmployee ? 'No Devices Assigned' : isAvailablePage ? 'No Available Inventory in Reserve' : 'No Devices Found'}
+              {isEmployee && !hasActiveFilter
+                ? 'No Devices Assigned'
+                : isAvailablePage
+                ? 'No Available Inventory in Reserve'
+                : 'No Devices Found'}
             </h3>
             <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: '0.88rem' }}>
-              {isEmployee
+              {isEmployee && !hasActiveFilter
                 ? 'You do not have any devices assigned yet. Click Request Equipment to submit a provisioning request.'
                 : isAvailablePage
                 ? 'All devices are currently allocated to team members. No reserve hardware available.'
@@ -450,12 +460,12 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
                     {!isEmployee && (
                       <td className="cell-location" style={{ whiteSpace: 'nowrap' }}>
                         {asset.status === 'ASSIGNED' && assignedName ? (
-                          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                            👤 {assignedName}
+                          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <IconUser size={13} color="var(--color-accent)" /> {assignedName}
                           </span>
                         ) : (
-                          <span style={{ color: '#888', fontStyle: 'italic' }}>
-                            📦 Available in Stock
+                          <span style={{ color: '#888', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <IconBox size={13} /> Available in Stock
                           </span>
                         )}
                       </td>
@@ -506,7 +516,7 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
                             )
                           }
                         >
-                          🎫 Report
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><IconAlert size={12} /> Report</span>
                         </button>
                       )}
 

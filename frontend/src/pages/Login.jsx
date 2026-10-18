@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { Logo2D, IconSun, IconMoon, IconInfo, IconAlert } from '../components/common/Icons';
 
 function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -45,18 +46,14 @@ function LoginPage() {
         title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
         aria-label="Toggle theme"
       >
-        {theme === 'dark' ? '☀️' : '🌙'}
+        {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
       </button>
 
       <div className="warm-auth-page-wrapper">
         <div className="warm-auth-card">
-          {/* Top Monitor Icon Badge */}
-          <div className="warm-auth-icon-badge">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-              <line x1="8" y1="21" x2="16" y2="21"></line>
-              <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
+          {/* Top 2D Minimalist Brand Logo Badge */}
+          <div className="warm-auth-icon-badge" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Logo2D size={28} color="#6366f1" />
           </div>
 
           {/* Header Brand */}
@@ -70,15 +67,15 @@ function LoginPage() {
 
           {/* Expired Session Notice */}
           {isExpired && !errorMessage && (
-            <div className="alert alert-warning" style={{ marginBottom: '1.25rem' }}>
-              ℹ️ Your session has expired. Please sign in again to continue.
+            <div className="alert alert-warning" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <IconInfo size={16} /> Your session has expired. Please sign in again to continue.
             </div>
           )}
 
           {/* Error Alert */}
           {errorMessage && (
-            <div className="alert alert-error" style={{ marginBottom: '1.25rem' }}>
-              ⚠️ {errorMessage}
+            <div className="alert alert-error" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <IconAlert size={16} /> {errorMessage}
             </div>
           )}
 

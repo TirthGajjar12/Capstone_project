@@ -1,5 +1,6 @@
 import React from 'react';
 import { Ticket } from '../../types';
+import { IconBox, IconLaptop } from '../common/Icons';
 
 interface TicketDetailDrawerProps {
   ticket: Ticket | null;
@@ -120,9 +121,12 @@ export const TicketDetailDrawer: React.FC<TicketDetailDrawerProps> = ({
                 padding: '0.15rem 0.45rem',
                 borderRadius: '4px',
                 fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem',
               }}
             >
-              💻 {ticket.asset.asset_tag || `AST-${ticket.asset.id}`}
+              <IconLaptop size={11} /> {ticket.asset.asset_tag || `AST-${ticket.asset.id}`}
             </span>
           )}
         </div>
@@ -192,7 +196,7 @@ export const TicketDetailDrawer: React.FC<TicketDetailDrawerProps> = ({
                     gap: '0.45rem',
                   }}
                 >
-                  <span>💻</span>
+                  <IconLaptop size={14} color="var(--color-accent)" />
                   <span>
                     Hardware Assigned:{' '}
                     <strong>{ticket.asset.asset_tag}</strong> ({ticket.asset.brand} {ticket.asset.model})
@@ -365,7 +369,7 @@ export const TicketDetailDrawer: React.FC<TicketDetailDrawerProps> = ({
                   }}
                   style={{ fontSize: '0.8rem', background: '#4f46e5', borderColor: '#4338ca' }}
                 >
-                  📦 Assign Hardware
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><IconBox size={13} /> Assign Hardware</span>
                 </button>
               )}
               {onResolveTicket && !isHardwareRequest && (ticket.status === 'IN_PROGRESS' || ticket.status === 'ASSIGNED') && (
