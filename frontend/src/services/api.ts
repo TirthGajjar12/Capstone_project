@@ -1,15 +1,18 @@
 import axios, { AxiosInstance } from 'axios';
 
 /**
- * Axios client pointed at the Vite proxy path `/api`.
- * The Vite dev-server proxy rewrites `/api/*` → `http://localhost:8000/*`.
+ * Base API URL. Defaults to http://localhost:8000 for local development,
+ * or uses VITE_API_URL when deployed (e.g. on Cloudflare Pages pointing to Render).
  */
+export const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+
 const apiClient: AxiosInstance = axios.create({
-  baseURL: '/api',
+  baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
 
 // Central response interceptor: clears expired sessions and redirects to login
 apiClient.interceptors.response.use(
@@ -80,6 +83,11 @@ export const wsService = {
     const baseUrl =
       import.meta.env.VITE_WS_URL ||
       (() => {
+        if (BASE_URL.startsWith('http')) {
+          const wsProto = BASE_URL.startsWith('https') ? 'wss:' : 'ws:';
+          const host = BASE_URL.replace(/^https?:\/\//, '');
+          return `${wsProto}//${host}/ws/notifications`;
+        }
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         return `${protocol}//${window.location.host}/ws/notifications`;
       })();
