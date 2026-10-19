@@ -4,7 +4,10 @@ import axios, { AxiosInstance } from 'axios';
  * Base API URL. Defaults to http://localhost:8000 for local development,
  * or uses VITE_API_URL when deployed (e.g. on Cloudflare Pages pointing to Render).
  */
-export const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+export const BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? 'https://capstone-project-ufng.onrender.com' : 'http://localhost:8000')
+).replace(/\/+$/, '');
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
