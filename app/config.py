@@ -1,4 +1,4 @@
-from pydantic import model_validator
+from pydantic import model_validator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
     DB_NAME: str = "it_asset_db"
+    DB_SSLMODE: str = ""
+    DATABASE_URL_ENV: str = Field(default="", validation_alias="DATABASE_URL")
 
     # Security Settings
     SECRET_KEY: str = "dev_insecure_secret_key_change_in_production"
@@ -49,10 +51,18 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
 
-    @property #we use @property when we want to access a method like an attribute, without parentheses
+    @property
     def database_url(self) -> str:
-        """Constructs PostgreSQL SQLAlchemy connection string."""
-        return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        """Constructs PostgreSQL SQLAlchemy connection string or normalizes DATABASE_URL."""
+        if self.DATABASE_URL_ENV:
+            url = self.DATABASE_URL_ENV
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+            elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+                url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            return url
+        ssl = f"?sslmode={self.DB_SSLMODE}" if self.DB_SSLMODE else ""
+        return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}{ssl}"
 
     @property
     def DATABASE_URL(self) -> str:
