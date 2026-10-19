@@ -55,4 +55,9 @@ class Settings(BaseSettings):
         """Constructs PostgreSQL SQLAlchemy connection string."""
         return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
+    @property
+    def DATABASE_URL(self) -> str:
+        """Alias for database_url supporting standard 12-factor uppercase environment conventions."""
+        return self.database_url
+
 settings = Settings()

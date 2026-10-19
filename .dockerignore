@@ -11,3 +11,4 @@ htmlcov
 .env
 frontend
 node_modules
+keys

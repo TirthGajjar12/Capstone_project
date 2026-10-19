@@ -1,7 +1,11 @@
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 from app.models.ticket import TicketPriority, TicketCategory
+
+if TYPE_CHECKING:
+    from app.models.user import User
+
 
 # SLA hours mapping
 SLA_HOURS = {

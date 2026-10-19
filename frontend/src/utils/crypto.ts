@@ -77,3 +77,12 @@ export async function encryptPassword(password: string): Promise<string> {
     );
   }
 }
+
+/**
+ * Clears the cached RSA public key from browser memory.
+ * Used for automatic self-healing if the backend restarted or rotated its RSA keypair.
+ */
+export function clearCachedPublicKey(): void {
+  cachedPublicKey = null;
+}
+

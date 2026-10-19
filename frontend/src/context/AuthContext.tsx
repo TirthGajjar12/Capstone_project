@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
-import { encryptPassword } from '../utils/crypto';
+import { encryptPassword, clearCachedPublicKey } from '../utils/crypto';
 
 interface AuthContextType {
   user: User | null;
@@ -60,11 +60,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       formData.append('username', email);
       formData.append('password', securePassword);
 
-      const response = await api.post('/auth/login', formData, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      });
+      let response;
+      try {
+        response = await api.post('/auth/login', formData, {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        });
+      } catch (postErr: any) {
+        const detail = postErr?.response?.data?.detail;
+        if (postErr?.response?.status === 400 && typeof detail === 'string' && detail.toLowerCase().includes('rsa')) {
+          clearCachedPublicKey();
+          const freshPassword = await encryptPassword(password);
+          formData.set('password', freshPassword);
+          response = await api.post('/auth/login', formData, {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+          });
+        } else {
+          throw postErr;
+        }
+      }
 
       const { access_token } = response.data;
       setToken(access_token);
@@ -95,7 +112,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const securePassword = await encryptPassword(password);
 
       // Register new user via POST /auth/register
-      await api.post('/auth/register', { full_name: fullName, email, password: securePassword, role });
+      try {
+        await api.post('/auth/register', { full_name: fullName, email, password: securePassword, role });
+      } catch (postErr: any) {
+        const detail = postErr?.response?.data?.detail;
+        if (postErr?.response?.status === 400 && typeof detail === 'string' && detail.toLowerCase().includes('rsa')) {
+          clearCachedPublicKey();
+          const freshPassword = await encryptPassword(password);
+          await api.post('/auth/register', { full_name: fullName, email, password: freshPassword, role });
+        } else {
+          throw postErr;
+        }
+      }
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
