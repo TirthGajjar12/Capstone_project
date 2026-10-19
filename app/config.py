@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     RSA_PRIVATE_KEY_PEM: str = ""
 
     # CORS Allowed Origins (comma-separated list for production configuration)
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000,https://capstone-frontend.oder50558.workers.dev"
 
     # Modern Pydantic V2 configuration
     model_config = SettingsConfigDict(
