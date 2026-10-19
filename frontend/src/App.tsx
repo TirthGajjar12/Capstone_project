@@ -114,7 +114,14 @@ function App() {
                 }
               />
               <Route path="/assets" element={<AssetList />} />
-              <Route path="/inventory/available" element={<AssetList availableOnly={true} />} />
+              <Route
+                path="/inventory/available"
+                element={
+                  <RoleRoute allowedRoles={['ADMIN', 'SUPPORT']}>
+                    <AssetList availableOnly={true} />
+                  </RoleRoute>
+                }
+              />
               <Route
                 path="/assets/create"
                 element={

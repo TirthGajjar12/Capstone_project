@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { assetService } from '../../services/ticketService';
 import { Asset } from '../../types';
@@ -58,10 +58,13 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
     }
   };
 
-  const fetchAssets = async () => {
+  const isFirstMount = useRef(true);
+  const filterChangeTriggered = useRef(false);
+
+  const fetchAssets = async (pageToFetch: number = currentPage) => {
     setLoading(true);
     try {
-      const skip = (currentPage - 1) * itemsPerPage;
+      const skip = (pageToFetch - 1) * itemsPerPage;
       const statusParam = isAvailablePage ? 'AVAILABLE' : (statusFilter || undefined);
       let typeParam: string | undefined = undefined;
       if (typeFilter === 'LAPTOPS') typeParam = 'Laptop';
@@ -86,13 +89,24 @@ export const AssetList: React.FC<AssetListProps> = ({ availableOnly = false }) =
   };
 
   useEffect(() => {
+    filterChangeTriggered.current = true;
     setCurrentPage(1);
+    fetchAssets(1);
+    fetchSummaryCounts();
   }, [statusFilter, typeFilter, search, isAvailablePage]);
 
   useEffect(() => {
-    fetchAssets();
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    if (filterChangeTriggered.current) {
+      filterChangeTriggered.current = false;
+      return;
+    }
+    fetchAssets(currentPage);
     fetchSummaryCounts();
-  }, [currentPage, statusFilter, typeFilter, search, isAvailablePage]);
+  }, [currentPage]);
 
   useWebSocket(() => {
     fetchAssets();

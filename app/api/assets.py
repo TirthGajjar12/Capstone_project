@@ -90,6 +90,19 @@ for _st in AssetStatus:
     ASSET_STATUS_LOOKUP[_st.name.lower()] = _st
 
 
+@router.get("/inventory/available", response_model=List[AssetResponse])
+@router.get("/available", response_model=List[AssetResponse])
+def get_available_inventory(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["ADMIN", "SUPPORT"]))
+):
+    """
+    List all available assets for allocation.
+    Strictly role-guarded to ADMIN and SUPPORT. Employees are forbidden.
+    """
+    return db.query(Asset).filter(Asset.status == AssetStatus.AVAILABLE).order_by(Asset.id.asc()).all()
+
+
 @router.get("", response_model=List[AssetResponse], include_in_schema=False)
 @router.get("/", response_model=List[AssetResponse])
 def list_assets(
@@ -112,6 +125,11 @@ def list_assets(
 
     if current_user.role == "EMPLOYEE":
         # Normal employees only see hardware assigned to them
+        if asset_status and asset_status.strip().upper() == "AVAILABLE":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Employees are not authorized to view available inventory."
+            )
         query = query.filter(Asset.assigned_to_id == current_user.id)
 
     # Filtering applies across all roles (Admin, Support, and Employee)

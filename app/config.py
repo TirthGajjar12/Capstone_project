@@ -36,7 +36,6 @@ class Settings(BaseSettings):
             insecure_defaults = {
                 "default_secret_key",
                 "dev_insecure_secret_key_change_in_production",
-                "661d43321fd322efb3978d4306eea25549609d6ce05199634c32163af4c9de8e",
             }
             if not self.SECRET_KEY or self.SECRET_KEY in insecure_defaults or len(self.SECRET_KEY) < 32:
                 raise ValueError(

@@ -591,5 +591,24 @@ def test_hardware_fulfillment_not_auto_assigned(client, employee_token):
     assert ticket["assigned_to_id"] is None
 
 
+def test_inventory_available_role_guard(client, employee_token, admin_token):
+    # Employees cannot access available inventory endpoint
+    res_emp_assets = client.get("/assets/inventory/available", headers={"Authorization": f"Bearer {employee_token}"})
+    assert res_emp_assets.status_code == 403
+
+    res_emp_root = client.get("/inventory/available", headers={"Authorization": f"Bearer {employee_token}"})
+    assert res_emp_root.status_code == 403
+
+    # Admin and Support can access available inventory endpoint
+    res_admin_assets = client.get("/assets/inventory/available", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_admin_assets.status_code == 200
+    assert isinstance(res_admin_assets.json(), list)
+
+    res_admin_root = client.get("/inventory/available", headers={"Authorization": f"Bearer {admin_token}"})
+    assert res_admin_root.status_code == 200
+    assert isinstance(res_admin_root.json(), list)
+
+
+
 
 

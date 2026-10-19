@@ -15,6 +15,12 @@ import app.models.user
 import app.models.asset
 import app.models.ticket
 
+from typing import List
+from app.api.deps import require_role
+from app.models.user import User
+from app.models.asset import Asset, AssetStatus
+from app.schemas.asset import AssetResponse
+
 # Import the new Auth Router
 from app.api.auth import router as auth_router
 from app.api.assets import router as assets_router
@@ -69,6 +75,14 @@ def root():
 def check_db_health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
     return {"status": "healthy", "database": "PostgreSQL connected successfully!"}
+
+@app.get("/inventory/available", response_model=List[AssetResponse], tags=["Assets"])
+def get_root_available_inventory(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["ADMIN", "SUPPORT"]))
+):
+    """List all available assets for allocation. Strictly restricted to Admin and Support staff."""
+    return db.query(Asset).filter(Asset.status == AssetStatus.AVAILABLE).order_by(Asset.id.asc()).all()
 
 
 @app.exception_handler(ResourceNotFoundError)
